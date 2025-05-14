@@ -16,7 +16,19 @@ function Get-FileEncoding {
   }
 }
 
-$adGuid = Read-Host "Введите GUID домена (adGuid)" # Вводим GUID домена с клавиатуры
+# Запрос пользователю
+$domainAnswer = Read-Host 'Требуется добавлять пользователей из домена? (Y/N)'
+$domainAnswer = $domainAnswer.ToLower()
+
+if ($domainAnswer -eq 'y' -or $domainAnswer -eq 'н') {
+  # Положительный ответ – берем GUID домена из AD
+  $adGuid = (Get-ADDomain).ObjectGUID.Guid
+}
+else {
+  # Отрицательный ответ – запрашиваем вручную
+  $adGuid = Read-Host "Введите GUID домена (adGuid)"
+}
+
 
 # Проходим по всем CSV-файлам в текущей папке
 foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv')) {
