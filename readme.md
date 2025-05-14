@@ -26,10 +26,11 @@
 | parent_sysconfig | GUID родителя для sysconfig.xml                         |
 
 **Пример содержимого:**
-name;login;person_guid;parent_energy;parent_sysconfig
-Буханов Андрей Юрьевич;Bukhanov.Ayu;;f0eb1cfb-7939-46e2-b36a-ba316b109a56;74f289ae-0eb9-4341-8912-8e211f4c01f9
-Алексенцев Александр Геннадьевич;Sokolov.Sni;;f0eb1cfb-7939-46e2-b36a-ba316b109a56;74f289ae-0eb9-4341-8912-8e211f4c01f9
-Михайлова Анна Сергеевна;Mikhaylova.Ase;;f0eb1cfb-7939-46e2-b36a-ba316b109a56;74f289ae-0eb9-4341-8912-8e211f4c01f9
+|name                            |login            |person_guid|parent_energy                       |parent_sysconfig                    |
+|--------------------------------|-----------------|-----------|------------------------------------|------------------------------------|
+|Буханов Андрей Юрьевич          |Bukhanov.Ayu     |           |f0eb1cfb-7939-46e2-b36a-ba316b109a56|74f289ae-0eb9-4341-8912-8e211f4c01f9|
+|Алексенцев Александр Геннадьевич|Sokolov.Sni      |           |f0eb1cfb-7939-46e2-b36a-ba316b109a56|74f289ae-0eb9-4341-8912-8e211f4c01f9|
+|Михайлова Анна Сергеевна        |Mikhaylova.Ase   |           |f0eb1cfb-7939-46e2-b36a-ba316b109a56|74f289ae-0eb9-4341-8912-8e211f4c01f9|
 
 *Если `person_guid` пуст, он будет автоматически сгенерирован и подставлен скриптом в итоговый CSV.*
 
