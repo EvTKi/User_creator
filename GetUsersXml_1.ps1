@@ -63,6 +63,7 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
     $mobilePhone = $line.mobilePhone
     $position = $line.position
     $OperationalAuthorities = $line.OperationalAuthorities
+    $electrical_safety_level = $line.electrical_safety_level
 
     $person_guid = $line.person_guid
     if ([string]::IsNullOrWhiteSpace($person_guid)) {
@@ -76,6 +77,7 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
     $fio_first = if ($fio.Length -ge 2) { $fio[1] } else { "" }
     $fio_middle = if ($fio.Length -ge 3) { $fio[2] } else { "" }
 
+    # Блок sysConfigXml не изменяем
     $sysConfigXml += @"
 <cim:User rdf:about="#_$person_guid">
 <cim:Principal.isEnabled>true</cim:Principal.isEnabled>
@@ -107,7 +109,7 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
 </cim:Person.mobilePhone>
 "@
     }
-    # POSITION BLOCK, если позиция не пуста
+    # POSITION BLOCK
     if (![string]::IsNullOrWhiteSpace($position)) {
       $positionBlock = "  <me:Person.Position rdf:resource='#_$position'/>"
     }
@@ -125,6 +127,12 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
           $operationalBlocks += '  <cim:Person.operationalAuthority rdf:resource="#_' + $trimmedUid + '" />' + "`n"
         }
       }
+    }
+
+    # ElectricalSafetyLevel block
+    $electricalSafetyBlock = ""
+    if (![string]::IsNullOrWhiteSpace($electrical_safety_level)) {
+      $electricalSafetyBlock += '  <me:Person.ElectricalSafetyLevel rdf:resource="#_' + $electrical_safety_level + '"/>' + "`n"
     }
 
     # Abbreviation для блока cim:Name (например, Иванов И.П.)
@@ -156,20 +164,22 @@ $operationalBlocks
 <cim:Person.mName>$fio_middle</cim:Person.mName>
 $phoneBlock
 $positionBlock
+$electricalSafetyBlock
 </cim:Person>
-$nameBlock`n
+$nameBlock
 "@
 
     $updatedRow = [PSCustomObject]@{
-      name                   = $name
-      login                  = $login
-      email                  = $email
-      mobilePhone            = $mobilePhone
-      position               = $position
-      OperationalAuthorities = $OperationalAuthorities
-      person_guid            = $person_guid
-      parent_energy          = $parent_energy
-      parent_sysconfig       = $parent_sysconfig
+      name                    = $name
+      login                   = $login
+      email                   = $email
+      mobilePhone             = $mobilePhone
+      position                = $position
+      OperationalAuthorities  = $OperationalAuthorities
+      electrical_safety_level = $electrical_safety_level
+      person_guid             = $person_guid
+      parent_energy           = $parent_energy
+      parent_sysconfig        = $parent_sysconfig
     }
     $updatedRows += $updatedRow
   }
