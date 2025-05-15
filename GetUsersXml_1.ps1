@@ -15,15 +15,17 @@ function Get-FileEncoding {
 }
 
 # Запрос пользователю
-$domainAnswer = Read-Host 'Требуется добавлять пользователей из домена? (Y/N)'
-$domainAnswer = $domainAnswer.ToLower()
+# $domainAnswer = Read-Host 'Требуется добавлять пользователей из домена? (Y/N)'
+# $domainAnswer = $domainAnswer.ToLower()
 
-if ($domainAnswer -eq 'y' -or $domainAnswer -eq 'н') {
-  $adGuid = (Get-ADDomain).ObjectGUID.Guid
-}
-else {
-  $adGuid = Read-Host "Введите GUID домена (adGuid)"
-}
+# if ($domainAnswer -eq 'y' -or $domainAnswer -eq 'н') {
+#   $adGuid = (Get-ADDomain).ObjectGUID.Guid
+# }
+# else {
+#   $adGuid = Read-Host "Введите GUID домена (adGuid)"
+# }
+
+$adGuid = Read-Host "Введите GUID домена (adGuid)"
 
 foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv')) {
   $encoding = Get-FileEncoding $csv.FullName
