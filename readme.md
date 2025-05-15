@@ -33,8 +33,8 @@
 | email                   | Электронная почта (опционально, попадёт в energy.xml как email1)                   |
 | mobilePhone             | Мобильный телефон (опционально, попадёт в energy.xml как localNumber)              |
 | position                | GUID должности (опционально, попадёт в energy.xml как Position)                    |
-| roles                   | GUID-ы ролей (опционально, попадёт в sysconfig.xml как roles)                      |
-| groups                  | GUID-ы групп пользователей (опционально, попадёт в sysconfig.xml как roles)        |
+| roles                   | Список GUID ролей (опционально, попадёт в sysconfig.xml как roles)                 |
+| groups                  | Список GUID групп пользователей (опционально, попадёт в sysconfig.xml как roles)   |
 | OperationalAuthorities  | Список GUID полномочий через `!` (energy.xml — массив блоков operationalAuthority) |
 | electrical_safety_level | GUID уровня электробезопасности (опционально, energy.xml — ElectricalSafetyLevel)  |
 | person_guid             | GUID пользователя (может быть пустым — заполнится скриптом)                        |
