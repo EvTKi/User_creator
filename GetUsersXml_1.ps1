@@ -61,6 +61,7 @@ foreach ($csv in $files) {
   # === Основной цикл по строкам CSV ===
   foreach ($line in $csvData) {
     # --- Универсальный поиск поля name ---
+    $person_guid = $line.person_guid
     $nameKey = $line.PSObject.Properties.Name | Where-Object { $_ -match "name$" }
     $name = $line.$nameKey
     if ([string]::IsNullOrWhiteSpace($name)) { continue }
@@ -73,7 +74,6 @@ foreach ($csv in $files) {
     $electrical_safety_level = $line.electrical_safety_level
     $roles = $line.roles
     $groups = $line.groups
-    $person_guid = $line.person_guid
     $parent_sysconfig = $line.parent_sysconfig
     $parent_energy = $line.parent_energy
 
@@ -201,6 +201,7 @@ $groupsBlocks
 
     # --- Для обновления CSV ---
     $updatedRow = [PSCustomObject]@{
+      person_guid             = $person_guid
       name                    = $name
       login                   = $login
       email                   = $email
@@ -210,7 +211,6 @@ $groupsBlocks
       electrical_safety_level = $electrical_safety_level
       roles                   = $roles
       groups                  = $groups
-      person_guid             = $person_guid
       parent_energy           = $parent_energy
       parent_sysconfig        = $parent_sysconfig
     }
