@@ -26,20 +26,20 @@
 
 - **Заголовок и поля:**
 
-| Колонка                 | Обязательно | Описание                                                                                    |
-| ----------------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| person_guid             | ❌           | GUID пользователя (может быть пустым — заполнится скриптом)                                 |
-| name                    | ✅           | ФИО пользователя (например, Иванов Иван Иванович)                                           |
-| login                   | ✅           | Логин пользователя                                                                          |
-| email                   | ❌           | Электронная почта (опционально, попадёт в energy.xml как email1)                            |
-| mobilePhone             | ❌           | Мобильный телефон (опционально, попадёт в energy.xml как localNumber)                       |
-| position                | ❌           | GUID должности (опционально, попадёт в energy.xml как Position)                             |
-| roles                   | ❌           | Список GUID ролей через `!`(опционально, попадёт в sysconfig.xml как Roles)                 |
-| groups                  | ❌           | Список GUID групп пользователей через `!` (опционально, попадёт в sysconfig.xml как Groups) |
-| OperationalAuthorities  | ❌           | Список GUID полномочий через `!` (energy.xml — массив блоков operationalAuthority)          |
-| electrical_safety_level | ❌           | GUID уровня электробезопасности (опционально, energy.xml — ElectricalSafetyLevel)           |
-| parent_energy           | ✅           | GUID родителя для energy.xml                                                                |
-| parent_sysconfig        | ✅           | GUID родителя для sysconfig.xml                                                             |
+| Колонка                 | Обязательно                         | Описание                                                                                    |
+| ----------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| person_guid             | <p style="text-align:center;">❌</p> | GUID пользователя (может быть пустым — заполнится скриптом)                                 |
+| name                    | <p style="text-align:center;">✅</p> | ФИО пользователя (например, Иванов Иван Иванович)                                           |
+| login                   | <p style="text-align:center;">✅</p> | Логин пользователя                                                                          |
+| email                   | <p style="text-align:center;">❌</p> | Электронная почта (опционально, попадёт в energy.xml как email1)                            |
+| mobilePhone             | <p style="text-align:center;">❌</p> | Мобильный телефон (опционально, попадёт в energy.xml как localNumber)                       |
+| position                | <p style="text-align:center;">❌</p> | GUID должности (опционально, попадёт в energy.xml как Position)                             |
+| roles                   | <p style="text-align:center;">❌</p> | Список GUID ролей через `!`(опционально, попадёт в sysconfig.xml как Roles)                 |
+| groups                  | <p style="text-align:center;">❌</p> | Список GUID групп пользователей через `!` (опционально, попадёт в sysconfig.xml как Groups) |
+| OperationalAuthorities  | <p style="text-align:center;">❌</p> | Список GUID полномочий через `!` (energy.xml — массив блоков operationalAuthority)          |
+| electrical_safety_level | <p style="text-align:center;">❌</p> | GUID уровня электробезопасности (опционально, energy.xml — ElectricalSafetyLevel)           |
+| parent_energy           | <p style="text-align:center;">✅</p> | GUID родителя для energy.xml                                                                |
+| parent_sysconfig        | <p style="text-align:center;">✅</p> | GUID родителя для sysconfig.xml                                                             |
 
 **Пример содержимого:**
 
