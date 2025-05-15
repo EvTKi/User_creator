@@ -6,10 +6,12 @@
 - Генерирует XML-файлы (`sysconfig.xml` и `energy.xml`) на основе данных из CSV
 - Если в строке отсутствует GUID пользователя (`person_guid`), он автоматически генерируется для этой строки
 - Итоговый person_guid записывается обратно в исходный CSV-файл
-- **Если в CSV присутствуют поля email,mobilePhone или position, они попадут в итоговый XML-файл:**
+- **Если в CSV присутствуют поля email, mobilePhone, position или OperationalAuthorities, они попадут в итоговый XML-файл:**
   - email — в блок `<cim:Person.electronicAddress><cim:ElectronicAddress.email1>…</cim:ElectronicAddress.email1>`
   - mobilePhone — в блок `<cim:Person.mobilePhone><cim:TelephoneNumber.localNumber>…</cim:TelephoneNumber.localNumber>`
-  - position — в блок`<me:Person.Position rdf:resource='#_значение'/>`
+  - position — в блок `<me:Person.Position rdf:resource='#_значение'/>`
+  - OperationalAuthorities — по каждому uid в списке (через "!") по строке `<cim:Person.operationalAuthority rdf:resource="#_uid" />`
+- **Для каждого пользователя формируется отдельный блок `<cim:Name ...>`. Ссылка на этот блок добавляется в `<cim:Person ...>` через строку `<cim:IdentifiedObject.Names rdf:resource="#_$guid"/>`.**
 - **Любые строки, где поле `name` пусто или состоит только из пробелов, а также Sample.csv, игнорируются и не попадают ни в XML, ни в CSV.**
 - **Независимо от исходной кодировки CSV (UTF-8, UTF-16, Windows-1251), файл пересохраняется во временный файл в Windows-1251 для гарантированной поддержки кириллицы и корректной работы в Excel.**
 
@@ -23,26 +25,27 @@
 
 - **Заголовок и поля:**
 
-| Колонка          | Описание                                                              |
-| ---------------- | --------------------------------------------------------------------- |
-| name             | ФИО пользователя (например, Иванов Иван Иванович)                     |
-| login            | Логин пользователя                                                    |
-| email            | Электронная почта (опционально, попадёт в energy.xml как email1)      |
-| mobilePhone      | Мобильный телефон (опционально, попадёт в energy.xml как localNumber) |
-| position         | UID должности (опционально, попадёт в energy.xml как Position)        |
-| person_guid      | GUID пользователя (может быть пустым — заполнится скриптом)           |
-| parent_energy    | GUID родителя для energy.xml                                          |
-| parent_sysconfig | GUID родителя для sysconfig.xml                                       |
+| Колонка                | Описание                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| name                   | ФИО пользователя (например, Иванов Иван Иванович)                                  |
+| login                  | Логин пользователя                                                                 |
+| email                  | Электронная почта (опционально, попадёт в energy.xml как email1)                   |
+| mobilePhone            | Мобильный телефон (опционально, попадёт в energy.xml как localNumber)              |
+| position               | UID должности (опционально, попадёт в energy.xml как Position)                     |
+| OperationalAuthorities | Список uid полномочий через `!` (попадёт в energy.xml как список отдельных блоков) |
+| person_guid            | GUID пользователя (может быть пустым — заполнится скриптом)                        |
+| parent_energy          | GUID родителя для energy.xml                                                       |
+| parent_sysconfig       | GUID родителя для sysconfig.xml                                                    |
 
 **Пример содержимого:**
 
-| name | login | email | mobilePhone | position | person_guid | parent_energy | parent_sysconfig |
-| ---- | ----- | ----- | ----------- | -------- | ----------- | ------------- | ---------------- ||
-| Буханов Андрей Юрьевич           | Bukhanov.Ayu   | ayu@mail.ru  | 9110001010  | 62c05a53-0b27-4a62-b958-c24840a13c30 |                                      | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
-| Алексенцев Александр Геннадьевич | Sokolov.Sni    | asni@mail.ru | 9215050011  |                                      | 62c05a53-0b27-4a62-b958-c24840a13c30 | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
-| Михайлова Анна Сергеевна         | Mikhaylova.Ase |              |             |                                      |                                      | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
+| name                             | login          | email        | mobilePhone | position                             | OperationalAuthorities | person_guid                          | parent_energy                        | parent_sysconfig                     |
+| -------------------------------- | -------------- | ------------ | ----------- | ------------------------------------ | ---------------------- | ------------------------------------ | ------------------------------------ | ------------------------------------ |
+| Буханов Андрей Юрьевич           | Bukhanov.Ayu   | ayu@mail.ru  | 9110001010  | 62c05a53-0b27-4a62-b958-c24840a13c30 | aa11!bb22!cc33         |                                      | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
+| Алексенцев Александр Геннадьевич | Sokolov.Sni    | asni@mail.ru | 9215050011  |                                      |                        | 62c05a53-0b27-4a62-b958-c24840a13c30 | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
+| Михайлова Анна Сергеевна         | Mikhaylova.Ase |              |             |                                      |                        |                                      | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
 
-*Поля email, mobilePhone, position могут быть опущены или оставаться пустыми — в этом случае соответствующие XML-блоки отсутствуют.*
+*Поля email, mobilePhone, position, OperationalAuthorities могут быть опущены или оставаться пустыми — в этом случае соответствующие XML-блоки отсутствуют.*
 
 *Если `person_guid` пуст, он будет автоматически сгенерирован и подставлен скриптом в итоговый CSV.*
 
@@ -71,7 +74,9 @@
     - `[исходный].energy.xml`
 - Если заполнено поле email — оно появится в XML `<cim:ElectronicAddress.email1>`.
 - Если заполнено поле mobilePhone — оно появится в XML `<cim:TelephoneNumber.localNumber>`.
-- Если заполнено поле position — в каждом блоге `<cim:Person ...>` появится `<me:Person.Position rdf:resource="#_значение"/>`.
+- Если заполнено поле position — в каждом блоке `<cim:Person ...>` появится `<me:Person.Position rdf:resource="#_значение"/>`.
+- Если заполнено поле OperationalAuthorities — в каждом блоке `<cim:Person ...>` появятся строки вида `<cim:Person.operationalAuthority rdf:resource="#_uid"/>` для каждого uid.
+- Для каждого пользователя появится отдельный блок `<cim:Name ...>` с отдельным GUID и сокращённым ФИО, а внутри блока Person будет ссылка `<cim:IdentifiedObject.Names rdf:resource="#_GUID"/>` на соответствующий Name.
 - **Строки без значения name (или если name только из пробелов) будут полностью проигнорированы и не попадут в экспортируемые файлы.**
 - **`Sample.csv` всегда пропускается.**
 

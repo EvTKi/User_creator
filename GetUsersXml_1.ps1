@@ -13,17 +13,14 @@
   }
 }
 
-# Ввод GUID домена вручную (или верните свой интерактив, если нужно)
 $adGuid = Read-Host "Введите GUID домена (adGuid)"
 
 foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.Name -ne 'Sample.csv' })) {
-  # --- Преобразуем CSV временно в windows-1251 ---
   $origEncoding = Get-FileEncoding $csv.FullName
   $origText = [System.IO.File]::ReadAllText($csv.FullName, [System.Text.Encoding]::GetEncoding($origEncoding))
   $tempCsv = [System.IO.Path]::GetTempFileName()
   [System.IO.File]::WriteAllText($tempCsv, $origText, [System.Text.Encoding]::GetEncoding("windows-1251"))
 
-  # --- Определяем разделитель ---
   $reader = New-Object System.IO.StreamReader($tempCsv, [System.Text.Encoding]::GetEncoding("windows-1251"))
   $firstLine = $reader.ReadLine()
   $reader.Close()
@@ -31,12 +28,10 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
   elseif ($firstLine -match ",") { $delimiter = "," }
   else { $delimiter = ";" }
 
-  # --- Читаем файл целиком как текст, приводим к объектам по разделителю ---
   $bytes = [System.IO.File]::ReadAllBytes($tempCsv)
   $text = [System.Text.Encoding]::GetEncoding("windows-1251").GetString($bytes)
   $csvData = $text | ConvertFrom-Csv -Delimiter $delimiter
 
-  # --- Заготовки для XML ---
   $sysConfigXml = @"
 <?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:cim="http://monitel.com/2014/schema-sysconfig#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -59,16 +54,16 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
 
   $updatedRows = @()
   foreach ($line in $csvData) {
-    # --- Универсальный поиск поля name (даже если BOM в заголовке) ---
     $nameKey = $line.PSObject.Properties.Name | Where-Object { $_ -match "name$" }
     $name = $line.$nameKey
-    if ([string]::IsNullOrWhiteSpace($name)) { continue } # Пропускаем строки без имени
+    if ([string]::IsNullOrWhiteSpace($name)) { continue }
 
     $login = $line.login
     $email = $line.email
     $mobilePhone = $line.mobilePhone
     $position = $line.position
-    
+    $OperationalAuthorities = $line.OperationalAuthorities
+
     $person_guid = $line.person_guid
     if ([string]::IsNullOrWhiteSpace($person_guid)) {
       $person_guid = [guid]::NewGuid().ToString()
@@ -112,7 +107,7 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
 </cim:Person.mobilePhone>
 "@
     }
-    # Блок Position (Только если не пустой, без лишних экранирований)
+    # POSITION BLOCK, если позиция не пуста
     if (![string]::IsNullOrWhiteSpace($position)) {
       $positionBlock = "  <me:Person.Position rdf:resource='#_$position'/>"
     }
@@ -120,28 +115,61 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
       $positionBlock = ""
     }
 
+    # OperationalAuthorities block
+    $operationalBlocks = ""
+    if (![string]::IsNullOrWhiteSpace($OperationalAuthorities)) {
+      $uids = $OperationalAuthorities -split "!"
+      foreach ($uid in $uids) {
+        $trimmedUid = $uid.Trim()
+        if ($trimmedUid) {
+          $operationalBlocks += '  <cim:Person.operationalAuthority rdf:resource="#_' + $trimmedUid + '" />' + "`n"
+        }
+      }
+    }
+
+    # Abbreviation для блока cim:Name (например, Иванов И.П.)
+    $abbreviation = $fio_last
+    if ($fio_first) { $abbreviation += " " + $fio_first.Substring(0, 1) + "." }
+    if ($fio_middle) { $abbreviation += $fio_middle.Substring(0, 1) + "." }
+
+    # GUID для блока <cim:Name> и ссылка на него из <cim:Person>
+    $name_guid = [guid]::NewGuid().ToString()
+    $cimNameRef = "<cim:IdentifiedObject.Names rdf:resource=""#_$name_guid"" />"
+
+    $nameBlock = @"
+<cim:Name rdf:about="#_$name_guid">
+<cim:Name.name>$abbreviation</cim:Name.name>
+<cim:Name.IdentifiedObject rdf:resource="#_$person_guid" />
+<cim:Name.NameType rdf:resource="#_00000002-0000-0000-c000-0000006d746c" />
+</cim:Name>
+"@
+
     $energyXml += @"
 <cim:Person rdf:about="#_$person_guid">
 <cim:IdentifiedObject.name>$name</cim:IdentifiedObject.name>
+$cimNameRef
 <me:IdentifiedObject.ParentObject rdf:resource="#_$parent_energy" />
 $emailBlock
+$operationalBlocks
 <cim:Person.firstName>$fio_first</cim:Person.firstName>
 <cim:Person.lastName>$fio_last</cim:Person.lastName>
 <cim:Person.mName>$fio_middle</cim:Person.mName>
 $phoneBlock
 $positionBlock
 </cim:Person>
+$nameBlock`n
 "@
 
     $updatedRow = [PSCustomObject]@{
-      name             = $name
-      login            = $login
-      email            = $email
-      mobilePhone      = $mobilePhone
-      position         = $position
-      person_guid      = $person_guid
-      parent_energy    = $parent_energy
-      parent_sysconfig = $parent_sysconfig
+      name                   = $name
+      login                  = $login
+      email                  = $email
+      mobilePhone            = $mobilePhone
+      position               = $position
+      OperationalAuthorities = $OperationalAuthorities
+      person_guid            = $person_guid
+      parent_energy          = $parent_energy
+      parent_sysconfig       = $parent_sysconfig
     }
     $updatedRows += $updatedRow
   }
