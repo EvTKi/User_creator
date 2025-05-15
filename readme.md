@@ -26,20 +26,20 @@
 
 - **Заголовок и поля:**
 
-| Колонка                 | Описание                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------------ |
-| name                    | ФИО пользователя (например, Иванов Иван Иванович)                                          |
-| login                   | Логин пользователя                                                                         |
-| email                   | Электронная почта (опционально, попадёт в energy.xml как email1)                           |
-| mobilePhone             | Мобильный телефон (опционально, попадёт в energy.xml как localNumber)                      |
-| position                | GUID должности (опционально, попадёт в energy.xml как Position)                            |
-| roles                   | Список GUID ролей через `!`(опционально, попадёт в sysconfig.xml как roles)                |
-| groups                  | Список GUID групп пользователей через `!` (опционально, попадёт в sysconfig.xml как roles) |
-| OperationalAuthorities  | Список GUID полномочий через `!` (energy.xml — массив блоков operationalAuthority)         |
-| electrical_safety_level | GUID уровня электробезопасности (опционально, energy.xml — ElectricalSafetyLevel)          |
-| person_guid             | GUID пользователя (может быть пустым — заполнится скриптом)                                |
-| parent_energy           | GUID родителя для energy.xml                                                               |
-| parent_sysconfig        | GUID родителя для sysconfig.xml                                                            |
+| Колонка                 | Описание                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------- |
+| name                    | ФИО пользователя (например, Иванов Иван Иванович)                                           |
+| login                   | Логин пользователя                                                                          |
+| email                   | Электронная почта (опционально, попадёт в energy.xml как email1)                            |
+| mobilePhone             | Мобильный телефон (опционально, попадёт в energy.xml как localNumber)                       |
+| position                | GUID должности (опционально, попадёт в energy.xml как Position)                             |
+| roles                   | Список GUID ролей через `!`(опционально, попадёт в sysconfig.xml как Roles)                 |
+| groups                  | Список GUID групп пользователей через `!` (опционально, попадёт в sysconfig.xml как Groups) |
+| OperationalAuthorities  | Список GUID полномочий через `!` (energy.xml — массив блоков operationalAuthority)          |
+| electrical_safety_level | GUID уровня электробезопасности (опционально, energy.xml — ElectricalSafetyLevel)           |
+| person_guid             | GUID пользователя (может быть пустым — заполнится скриптом)                                 |
+| parent_energy           | GUID родителя для energy.xml                                                                |
+| parent_sysconfig        | GUID родителя для sysconfig.xml                                                             |
 
 **Пример содержимого:**
 
