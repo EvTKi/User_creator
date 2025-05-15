@@ -13,9 +13,12 @@
   }
 }
 
+# --- Чтение данных ---
 $adGuid = Read-Host "Введите GUID домена (adGuid)"
+$files = Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.Name -ne 'Sample.csv' }
 
-foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.Name -ne 'Sample.csv' })) {
+foreach ($csv in $files) {
+  # --- Преобразование кодировки и парсинг CSV ---
   $origEncoding = Get-FileEncoding $csv.FullName
   $origText = [System.IO.File]::ReadAllText($csv.FullName, [System.Text.Encoding]::GetEncoding($origEncoding))
   $tempCsv = [System.IO.Path]::GetTempFileName()
@@ -32,6 +35,7 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
   $text = [System.Text.Encoding]::GetEncoding("windows-1251").GetString($bytes)
   $csvData = $text | ConvertFrom-Csv -Delimiter $delimiter
 
+  # --- Заголовки energy/sysconfig ---
   $sysConfigXml = @"
 <?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:cim="http://monitel.com/2014/schema-sysconfig#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -53,7 +57,10 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
 "@
 
   $updatedRows = @()
+
+  # === Основной цикл по строкам CSV ===
   foreach ($line in $csvData) {
+    # --- Универсальный поиск поля name ---
     $nameKey = $line.PSObject.Properties.Name | Where-Object { $_ -match "name$" }
     $name = $line.$nameKey
     if ([string]::IsNullOrWhiteSpace($name)) { continue }
@@ -64,31 +71,23 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
     $position = $line.position
     $OperationalAuthorities = $line.OperationalAuthorities
     $electrical_safety_level = $line.electrical_safety_level
-
+    $roles = $line.roles
+    $groups = $line.groups
     $person_guid = $line.person_guid
+    $parent_sysconfig = $line.parent_sysconfig
+    $parent_energy = $line.parent_energy
+
     if ([string]::IsNullOrWhiteSpace($person_guid)) {
       $person_guid = [guid]::NewGuid().ToString()
     }
-    $parent_sysconfig = $line.parent_sysconfig
-    $parent_energy = $line.parent_energy
 
     $fio = $name -split ' '
     $fio_last = if ($fio.Length -ge 1) { $fio[0] } else { "" }
     $fio_first = if ($fio.Length -ge 2) { $fio[1] } else { "" }
     $fio_middle = if ($fio.Length -ge 3) { $fio[2] } else { "" }
 
-    # Блок sysConfigXml не изменяем
-    $sysConfigXml += @"
-<cim:User rdf:about="#_$person_guid">
-<cim:Principal.isEnabled>true</cim:Principal.isEnabled>
-<cim:Principal.Domain rdf:resource="#_$adGuid" />
-<cim:User.login>$login</cim:User.login>
-<cim:IdentifiedObject.name>$name</cim:IdentifiedObject.name>
-<cim:IdentifiedObject.ParentObject rdf:resource="#_$parent_sysconfig" />
-</cim:User>
-"@
-
-    # EMAIL и PHONE блоки если заполнены
+    # === Подготовка блоков energy ===
+    # Email, phone
     $emailBlock = ""
     if ($email) {
       $emailBlock = @"
@@ -109,15 +108,12 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
 </cim:Person.mobilePhone>
 "@
     }
-    # POSITION BLOCK
+    # Position
+    $positionBlock = ""
     if (![string]::IsNullOrWhiteSpace($position)) {
       $positionBlock = "  <me:Person.Position rdf:resource='#_$position'/>"
     }
-    else {
-      $positionBlock = ""
-    }
-
-    # OperationalAuthorities block
+    # OperationalAuthorities
     $operationalBlocks = ""
     if (![string]::IsNullOrWhiteSpace($OperationalAuthorities)) {
       $uids = $OperationalAuthorities -split "!"
@@ -128,22 +124,18 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
         }
       }
     }
-
-    # ElectricalSafetyLevel block
+    # ElectricalSafetyLevel
     $electricalSafetyBlock = ""
     if (![string]::IsNullOrWhiteSpace($electrical_safety_level)) {
-      $electricalSafetyBlock += '  <me:Person.ElectricalSafetyLevel rdf:resource="#_' + $electrical_safety_level + '"/>' + "`n"
+      $electricalSafetyBlock = '  <me:Person.ElectricalSafetyLevel rdf:resource="#_' + $electrical_safety_level + '"/>' + "`n"
     }
-
-    # Abbreviation для блока cim:Name (например, Иванов И.П.)
+    # Abbreviation for Name
     $abbreviation = $fio_last
     if ($fio_first) { $abbreviation += " " + $fio_first.Substring(0, 1) + "." }
     if ($fio_middle) { $abbreviation += $fio_middle.Substring(0, 1) + "." }
-
-    # GUID для блока <cim:Name> и ссылка на него из <cim:Person>
+    # Name block GUID and reference
     $name_guid = [guid]::NewGuid().ToString()
     $cimNameRef = "<cim:IdentifiedObject.Names rdf:resource=""#_$name_guid"" />"
-
     $nameBlock = @"
 <cim:Name rdf:about="#_$name_guid">
 <cim:Name.name>$abbreviation</cim:Name.name>
@@ -152,6 +144,31 @@ foreach ($csv in (Get-ChildItem -Path $PWD -Filter '*.csv' | Where-Object { $_.N
 </cim:Name>
 "@
 
+    # === Подготовка блоков sysconfig ===
+    # Roles (разделитель !)
+    $rolesBlocks = ""
+    if (![string]::IsNullOrWhiteSpace($roles)) {
+      $rolesList = $roles -split "!"
+      foreach ($role in $rolesList) {
+        $role = $role.Trim()
+        if ($role) {
+          $rolesBlocks += '  <cim:Principal.Roles rdf:resource="#_' + $role + '" />'
+        }
+      }
+    }
+    # Groups (разделитель !)
+    $groupsBlocks = ""
+    if (![string]::IsNullOrWhiteSpace($groups)) {
+      $groupsList = $groups -split "!"
+      foreach ($group in $groupsList) {
+        $group = $group.Trim()
+        if ($group) {
+          $groupsBlocks += '  <cim:Principal.Groups rdf:resource="#_' + $group + '" />'
+        }
+      }
+    }
+
+    # === Формирование energy ===
     $energyXml += @"
 <cim:Person rdf:about="#_$person_guid">
 <cim:IdentifiedObject.name>$name</cim:IdentifiedObject.name>
@@ -169,6 +186,20 @@ $electricalSafetyBlock
 $nameBlock
 "@
 
+    # === Формирование sysconfig ===
+    $sysConfigXml += @"
+<cim:User rdf:about="#_$person_guid">
+<cim:Principal.Domain rdf:resource="#_$adGuid" />
+<cim:IdentifiedObject.name>$name</cim:IdentifiedObject.name>
+<cim:Principal.isEnabled>true</cim:Principal.isEnabled>
+<cim:User.login>$login</cim:User.login>
+<cim:IdentifiedObject.ParentObject rdf:resource="#_$parent_sysconfig" />
+$rolesBlocks
+$groupsBlocks 
+</cim:User>`n
+"@
+
+    # --- Для обновления CSV ---
     $updatedRow = [PSCustomObject]@{
       name                    = $name
       login                   = $login
@@ -177,6 +208,8 @@ $nameBlock
       position                = $position
       OperationalAuthorities  = $OperationalAuthorities
       electrical_safety_level = $electrical_safety_level
+      roles                   = $roles
+      groups                  = $groups
       person_guid             = $person_guid
       parent_energy           = $parent_energy
       parent_sysconfig        = $parent_sysconfig
@@ -184,6 +217,7 @@ $nameBlock
     $updatedRows += $updatedRow
   }
 
+  # ==== Финализация файлов ====
   $sysConfigXml += @"
 </rdf:RDF>
 "@
@@ -195,7 +229,6 @@ $nameBlock
   [System.IO.File]::WriteAllText([IO.Path]::ChangeExtension($csv.FullName, 'energy.xml'), $energyXml, [System.Text.Encoding]::UTF8)
 
   $updatedRows | Export-Csv -Path $csv.FullName -Delimiter $delimiter -Encoding Default -NoTypeInformation
-
   Remove-Item $tempCsv -ErrorAction SilentlyContinue
 }
 

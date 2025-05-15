@@ -1,4 +1,5 @@
 /Лист Microsoft Excel.energy.xml
 /Лист Microsoft Excel.sysconfig.xml
 *.xlsx
+*.xlsm
 *.xml
