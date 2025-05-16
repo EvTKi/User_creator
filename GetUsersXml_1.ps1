@@ -39,21 +39,21 @@ foreach ($csv in $files) {
   $sysConfigXml = @"
 <?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:cim="http://monitel.com/2014/schema-sysconfig#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-<md:FullModel rdf:about="#_sysconfig">
-<md:Model.created>$(Get-Date -Format s)Z</md:Model.created>
-<md:Model.version>2020-07-09(11.6.2.35)</md:Model.version>
-<me:Model.name xmlns:me="http://monitel.com/2014/schema-cim16#">SysConfig</me:Model.name>
-</md:FullModel>
+    <md:FullModel rdf:about="#_sysconfig">
+        <md:Model.created>$(Get-Date -Format s)Z</md:Model.created>
+        <md:Model.version>2020-07-09(11.6.2.35)</md:Model.version>
+        <me:Model.name xmlns:me="http://monitel.com/2014/schema-cim16#">SysConfig</me:Model.name>
+    </md:FullModel>`n
 "@
 
   $energyXml = @"
 <?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:cim="http://iec.ch/TC57/2014/CIM-schema-cim16#" xmlns:cim17="http://iec.ch/TC57/2014/CIM-schema-cim17#" xmlns:me="http://monitel.com/2014/schema-cim16#" xmlns:rh="http://rushydro.ru/2015/schema-cim16#" xmlns:so="http://so-ups.ru/2015/schema-cim16#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-<md:FullModel rdf:about="#_energy">
-<md:Model.created>$(Get-Date -Format s)Z</md:Model.created>
-<md:Model.version>ver:11.6.2.193;opt:Aggr,AMI,...</md:Model.version>
-<me:Model.name>CIM16</me:Model.name>
-</md:FullModel>
+    <md:FullModel rdf:about="#_energy">
+        <md:Model.created>$(Get-Date -Format s)Z</md:Model.created>
+        <md:Model.version>ver:11.6.2.193;opt:Aggr,AMI,...</md:Model.version>
+        <me:Model.name>CIM16</me:Model.name>
+    </md:FullModel>`n
 "@
 
   $updatedRows = @()
@@ -92,26 +92,26 @@ foreach ($csv in $files) {
     if ($email) {
       $emailBlock = @"
 <cim:Person.electronicAddress>
-  <cim:ElectronicAddress>
-    <cim:ElectronicAddress.email1>$email</cim:ElectronicAddress.email1>
-  </cim:ElectronicAddress>
-</cim:Person.electronicAddress>
+      <cim:ElectronicAddress>
+        <cim:ElectronicAddress.email1>$email</cim:ElectronicAddress.email1>
+      </cim:ElectronicAddress>
+    </cim:Person.electronicAddress>
 "@
     }
     $phoneBlock = ""
     if ($mobilePhone) {
       $phoneBlock = @"
 <cim:Person.mobilePhone>
-  <cim:TelephoneNumber>
-    <cim:TelephoneNumber.localNumber>$mobilePhone</cim:TelephoneNumber.localNumber>
-  </cim:TelephoneNumber>
-</cim:Person.mobilePhone>
+      <cim:TelephoneNumber>
+        <cim:TelephoneNumber.localNumber>$mobilePhone</cim:TelephoneNumber.localNumber>
+      </cim:TelephoneNumber>
+    </cim:Person.mobilePhone>
 "@
     }
     # Position
     $positionBlock = ""
     if (![string]::IsNullOrWhiteSpace($position)) {
-      $positionBlock = "  <me:Person.Position rdf:resource='#_$position'/>"
+      $positionBlock = "<me:Person.Position rdf:resource='#_$position'/>"
     }
     # OperationalAuthorities
     $operationalBlocks = ""
@@ -120,28 +120,28 @@ foreach ($csv in $files) {
       foreach ($uid in $uids) {
         $trimmedUid = $uid.Trim()
         if ($trimmedUid) {
-          $operationalBlocks += '  <me:Person.OperationalAuthorities rdf:resource="#_' + $trimmedUid + '" />' + "`n"
+          $operationalBlocks += '    <me:Person.OperationalAuthorities rdf:resource="#_' + $trimmedUid + '" />' + "`n"
         }
       }
     }
     # ElectricalSafetyLevel
     $electricalSafetyBlock = ""
     if (![string]::IsNullOrWhiteSpace($electrical_safety_level)) {
-      $electricalSafetyBlock = '  <me:Person.ElectricalSafetyLevel rdf:resource="#_' + $electrical_safety_level + '"/>' + "`n"
+      $electricalSafetyBlock = '<me:Person.ElectricalSafetyLevel rdf:resource="#_' + $electrical_safety_level + '"/>' #+ "`n"
     }
     # Abbreviation for Name
     $abbreviation = $fio_last
     if ($fio_first) { $abbreviation += " " + $fio_first.Substring(0, 1) + "." }
     if ($fio_middle) { $abbreviation += $fio_middle.Substring(0, 1) + "." }
     # Name block GUID and reference
-    $name_guid = [guid]::NewGuid().ToString()
-    $cimNameRef = "<cim:IdentifiedObject.Names rdf:resource=""#_$name_guid"" />"
+    $nmae_abbreviation_guid = [guid]::NewGuid().ToString()
+    $cimNameRef = "<cim:IdentifiedObject.Names rdf:resource=""#_$nmae_abbreviation_guid"" />"
     $nameBlock = @"
-<cim:Name rdf:about="#_$name_guid">
-<cim:Name.name>$abbreviation</cim:Name.name>
-<cim:Name.IdentifiedObject rdf:resource="#_$person_guid" />
-<cim:Name.NameType rdf:resource="#_00000002-0000-0000-c000-0000006d746c" />
-</cim:Name>
+<cim:Name rdf:about="#_$nmae_abbreviation_guid">
+        <cim:Name.name>$abbreviation</cim:Name.name>
+        <cim:Name.IdentifiedObject rdf:resource="#_$person_guid" />
+        <cim:Name.NameType rdf:resource="#_00000002-0000-0000-c000-0000006d746c" />
+    </cim:Name>
 "@
 
     # === Подготовка блоков sysconfig ===
@@ -152,7 +152,7 @@ foreach ($csv in $files) {
       foreach ($role in $rolesList) {
         $role = $role.Trim()
         if ($role) {
-          $rolesBlocks += '  <cim:Principal.Roles rdf:resource="#_' + $role + '" />'
+          $rolesBlocks += '<cim:Principal.Roles rdf:resource="#_' + $role + '" />'
         }
       }
     }
@@ -163,40 +163,40 @@ foreach ($csv in $files) {
       foreach ($group in $groupsList) {
         $group = $group.Trim()
         if ($group) {
-          $groupsBlocks += '  <cim:Principal.Groups rdf:resource="#_' + $group + '" />'
+          $groupsBlocks += '<cim:Principal.Groups rdf:resource="#_' + $group + '" />'
         }
       }
     }
 
     # === Формирование energy ===
     $energyXml += @"
-<cim:Person rdf:about="#_$person_guid">
-<cim:IdentifiedObject.name>$name</cim:IdentifiedObject.name>
-$cimNameRef
-<me:IdentifiedObject.ParentObject rdf:resource="#_$parent_energy" />
-$emailBlock
-$operationalBlocks
-<cim:Person.firstName>$fio_first</cim:Person.firstName>
-<cim:Person.lastName>$fio_last</cim:Person.lastName>
-<cim:Person.mName>$fio_middle</cim:Person.mName>
-$phoneBlock
-$positionBlock
-$electricalSafetyBlock
-</cim:Person>
-$nameBlock
+    <cim:Person rdf:about="#_$person_guid">
+        <cim:IdentifiedObject.name>$name</cim:IdentifiedObject.name>
+        $cimNameRef
+        <me:IdentifiedObject.ParentObject rdf:resource="#_$parent_energy" />
+        $emailBlock
+        <cim:Person.firstName>$fio_first</cim:Person.firstName>
+        <cim:Person.lastName>$fio_last</cim:Person.lastName>
+        <cim:Person.mName>$fio_middle</cim:Person.mName>
+        $phoneBlock
+        $positionBlock
+        $electricalSafetyBlock
+    $operationalBlocks
+    </cim:Person>
+    $nameBlock`n
 "@
 
     # === Формирование sysconfig ===
     $sysConfigXml += @"
-<cim:User rdf:about="#_$person_guid">
-<cim:Principal.Domain rdf:resource="#_$adGuid" />
-<cim:IdentifiedObject.name>$name</cim:IdentifiedObject.name>
-<cim:Principal.isEnabled>true</cim:Principal.isEnabled>
-<cim:User.login>$login</cim:User.login>
-<cim:IdentifiedObject.ParentObject rdf:resource="#_$parent_sysconfig" />
-$rolesBlocks
-$groupsBlocks 
-</cim:User>`n
+    <cim:User rdf:about="#_$person_guid">
+        <cim:IdentifiedObject.name>$name</cim:IdentifiedObject.name>
+        <cim:Principal.Domain rdf:resource="#_$adGuid" />
+        <cim:Principal.isEnabled>true</cim:Principal.isEnabled>
+        <cim:User.login>$login</cim:User.login>
+        <cim:IdentifiedObject.ParentObject rdf:resource="#_$parent_sysconfig" />
+        $rolesBlocks
+        $groupsBlocks 
+    </cim:User>`n
 "@
 
     # --- Для обновления CSV ---
