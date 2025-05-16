@@ -120,7 +120,7 @@ foreach ($csv in $files) {
       foreach ($uid in $uids) {
         $trimmedUid = $uid.Trim()
         if ($trimmedUid) {
-          $operationalBlocks += '  <cim:Person.operationalAuthority rdf:resource="#_' + $trimmedUid + '" />' + "`n"
+          $operationalBlocks += '  <me:Person.OperationalAuthorities rdf:resource="#_' + $trimmedUid + '" />' + "`n"
         }
       }
     }
