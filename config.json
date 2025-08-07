@@ -1,22 +1,22 @@
 {
+    "output": {
+      "log_dir": "log",
+      "energy_xml_suffix": "_Energy.xml",
+      "sysconfig_xml_suffix": "_SysConfig.xml",
+      "not_in_ad_csv": "not_in_AD.csv"
+    },
     "ad": {
       "enabled": true,
-      "domain_controller": "your-dc.your-domain.local",
-      "domain_dn": "DC=your-domain,DC=local",
-      "user": "admin@your-domain.local"
+      "domain_controller": "ldap://your-domain.com",
+      "domain_dn": "DC=domain,DC=com",
+      "user": "CN=Admin,CN=Users,DC=domain,DC=com"
     },
     "input": {
       "encoding": "windows-1251",
       "delimiter": ";"
     },
-    "output": {
-      "energy_xml_suffix": ".energy.xml",
-      "sysconfig_xml_suffix": ".sysconfig.xml",
-      "not_in_ad_csv": "not_in_AD.csv",
-      "log_dir": "logs"
-    },
     "xml": {
-      "model_version_sysconfig": "2020-07-09(11.6.2.35)",
-      "model_version_energy": "ver:11.7.1.256;"
+      "model_version_sysconfig": "1.0",
+      "model_version_energy": "1.0"
     }
   }

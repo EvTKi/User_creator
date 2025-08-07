@@ -1,6 +1,7 @@
-/Лист Microsoft Excel.energy.xml
-/Лист Microsoft Excel.sysconfig.xml
+!Sample.csv
 *.xlsx
 *.xlsm
 *.xml
-/Тест.csv
+
+/log
+__pycache__
