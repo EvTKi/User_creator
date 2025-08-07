@@ -1,106 +1,128 @@
 ﻿# main.py
 
 import os
+import sys
 import csv
 import uuid
-import chardet
+import json
+import logging
 from datetime import datetime
 from typing import List, Dict, Optional
+from pathlib import Path
 import getpass
 import ldap3
 from ldap3 import Server, Connection, ALL, AUTO_BIND_NO_TLS
 
-# --- Конфигурация ---
-DOMAIN_SERVER = 'your-domain-controller.your-domain.local'  # Заменить
-DOMAIN_DN = 'DC=your-domain,DC=local'                     # Заменить
-AD_USER = 'your_ad_user@your-domain.local'                # Заменить
-AD_PASSWORD = getpass.getpass("Введите пароль AD: ")       # Безопасный ввод
+# --- Загрузка конфигурации ---
+CONFIG_PATH = 'config.json'
 
-# --- Вспомогательные функции ---
+if not os.path.exists(CONFIG_PATH):
+    print(f"❌ Файл конфигурации не найден: {CONFIG_PATH}")
+    sys.exit(1)
 
-def detect_encoding(file_path: str) -> str:
-    """Определяет кодировку файла (с приоритетом BOM)"""
+with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
+# --- Настройка логирования ---
+log_dir = config['output']['log_dir']
+os.makedirs(log_dir, exist_ok=True)
+
+log_file = os.path.join(log_dir, f"app_{datetime.now().strftime('%Y-%m-%d')}.log")
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)-8s | %(message)s',
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# --- Константы ---
+AD_ENABLED = config['ad']['enabled']
+DOMAIN_CONTROLLER = config['ad']['domain_controller']
+DOMAIN_DN = config['ad']['domain_dn']
+AD_USER = config['ad']['user']
+INPUT_ENCODING = config['input']['encoding']  # должно быть "windows-1251"
+DELIMITER = config['input']['delimiter']
+ENERGY_SUFFIX = config['output']['energy_xml_suffix']
+SYSCONFIG_SUFFIX = config['output']['sysconfig_xml_suffix']
+NOT_IN_AD_CSV = config['output']['not_in_ad_csv']
+MODEL_VERSION_SYS = config['xml']['model_version_sysconfig']
+MODEL_VERSION_ENERGY = config['xml']['model_version_energy']
+
+# --- Определение кодировки (как в PowerShell) ---
+def get_file_encoding(file_path: str) -> str:
+    """Определяет кодировку файла, как в PowerShell-функции Get-FileEncoding"""
     with open(file_path, 'rb') as f:
         raw = f.read(4)
     if raw.startswith(b'\xef\xbb\xbf'):
         return 'utf-8-sig'
+    elif raw.startswith(b'\xff\xfe\x00\x00'):
+        return 'utf-32'
     elif raw.startswith(b'\xff\xfe'):
-        return 'utf-16-le'
+        return 'utf-16'
     elif raw.startswith(b'\xfe\xff'):
-        return 'utf-16-be'
+        return 'big-endian-unicode'
     else:
-        result = chardet.detect(raw)
-        return result['encoding'] or 'windows-1251'
+        return INPUT_ENCODING  # По умолчанию windows-1251
 
-def detect_delimiter(first_line: str) -> str:
-    """Определяет разделитель: ; или ,"""
-    if ';' in first_line:
-        return ';'
-    elif ',' in first_line:
-        return ','
-    return ';'
-
-def connect_to_ad() -> Optional[Connection]:
-    """Подключается к Active Directory"""
-    server = Server(DOMAIN_SERVER, get_info=ALL)
+# --- Подключение к AD ---
+def connect_to_ad(password: str) -> Optional[Connection]:
+    server = Server(DOMAIN_CONTROLLER, get_info=ALL)
     try:
-        conn = Connection(
-            server,
-            user=AD_USER,
-            password=AD_PASSWORD,
-            auto_bind=True
-        )
-        print("✅ Подключение к AD успешно.")
+        conn = Connection(server, user=AD_USER, password=password, auto_bind=True)
+        logger.info("✅ Подключение к AD успешно.")
         return conn
     except Exception as e:
-        print(f"❌ Ошибка подключения к AD: {e}")
+        logger.error(f"❌ Ошибка подключения к AD: {e}")
         return None
 
 def get_user_guid(conn: Connection, sAMAccountName: str) -> Optional[str]:
-    """Получает ObjectGUID пользователя по логину"""
-    conn.search(
-        search_base=DOMAIN_DN,
-        search_filter=f'(sAMAccountName={sAMAccountName})',
-        attributes=['objectGUID']
-    )
-    if len(conn.entries) > 0:
-        # objectGUID возвращается как байты, конвертируем в строку GUID
-        guid_bytes = conn.entries[0].objectGUID.raw_values[0]
-        # Переворачиваем первые 4 байта (little-endian)
-        guid = uuid.UUID(bytes_le=guid_bytes)
-        return str(guid).upper()
+    """Получает ObjectGUID по логину"""
+    try:
+        conn.search(
+            search_base=DOMAIN_DN,
+            search_filter=f'(sAMAccountName={sAMAccountName})',
+            attributes=['objectGUID']
+        )
+        if conn.entries:
+            guid_bytes = conn.entries[0].objectGUID.raw_values[0]
+            guid = uuid.UUID(bytes_le=guid_bytes)
+            return str(guid).upper()
+    except Exception as e:
+        logger.warning(f"⚠️ Ошибка при поиске GUID для {sAMAccountName}: {e}")
     return None
 
 # --- Генерация XML ---
-
-def generate_sysconfig_xml(ad_guid: str, users_data: List[Dict]) -> str:
+def generate_sysconfig_xml(ad_guid: str, users: List[Dict]) -> str:
     xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:cim="http://monitel.com/2014/schema-sysconfig#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <md:FullModel rdf:about="#_sysconfig">
       <md:Model.created>{datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")}Z</md:Model.created>
-      <md:Model.version>2020-07-09(11.6.2.35)</md:Model.version>
+      <md:Model.version>{MODEL_VERSION_SYS}</md:Model.version>
       <me:Model.name xmlns:me="http://monitel.com/2014/schema-cim16#">SysConfig</me:Model.name>
   </md:FullModel>
 '''
-    for user in users_data:
+    for user in users:
         person_guid = user['person_guid']
         name = user['name']
-        login = user['login'] or ''
-        parent_sysconfig = user['parent_sysconfig'] or ''
-        roles = user['roles'] or ''
-        groups = user['groups'] or ''
+        login = user.get('login', '') or ''
+        parent_sysconfig = user.get('parent_sysconfig', '') or ''
+        roles = user.get('roles', '') or ''
+        groups = user.get('groups', '') or ''
 
-        roles_blocks = ''
-        if roles:
-            for role in filter(None, [r.strip() for r in roles.split('!')]):
-                roles_blocks += f'<cim:Principal.Roles rdf:resource="#_{role}" />'
-
-        groups_blocks = ''
-        if groups:
-            for group in filter(None, [g.strip() for g in groups.split('!')]):
-                groups_blocks += f'<cim:Principal.Groups rdf:resource="#_{group}" />'
+        roles_blocks = ''.join(
+            f'<cim:Principal.Roles rdf:resource="#_{r.strip()}" />'
+            for r in roles.split('!') if r.strip()
+        )
+        groups_blocks = ''.join(
+            f'<cim:Principal.Groups rdf:resource="#_{g.strip()}" />'
+            for g in groups.split('!') if g.strip()
+        )
 
         xml += f'''
+
   <cim:User rdf:about="#_{person_guid}">
       <cim:IdentifiedObject.name>{name}</cim:IdentifiedObject.name>
       <cim:Principal.Domain rdf:resource="#_{ad_guid}" />
@@ -114,26 +136,25 @@ def generate_sysconfig_xml(ad_guid: str, users_data: List[Dict]) -> str:
     xml += '</rdf:RDF>'
     return xml
 
-def generate_energy_xml(users_data: List[Dict]) -> str:
+def generate_energy_xml(users: List[Dict]) -> str:
     xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:cim="http://iec.ch/TC57/2014/CIM-schema-cim16#" xmlns:cim17="http://iec.ch/TC57/2014/CIM-schema-cim17#" xmlns:me="http://monitel.com/2014/schema-cim16#" xmlns:rh="http://rushydro.ru/2015/schema-cim16#" xmlns:so="http://so-ups.ru/2015/schema-cim16#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <md:FullModel rdf:about="#_energy">
       <md:Model.created>{datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")}Z</md:Model.created>
-      <md:Model.version>ver:11.6.2.193;opt:Aggr,AMI,...</md:Model.version>
+      <md:Model.version>{MODEL_VERSION_ENERGY}</md:Model.version>
       <me:Model.name>CIM16</me:Model.name>
   </md:FullModel>
 '''
-    for user in users_data:
+    for user in users:
         person_guid = user['person_guid']
         name = user['name']
-        email = user['email'] or ''
-        mobile = user['mobilePhone'] or ''
-        position = user['position'] or ''
-        operational = user['OperationalAuthorities'] or ''
-        electrical = user['electrical_safety_level'] or ''
-        parent_energy = user['parent_energy'] or ''
+        email = user.get('email', '') or ''
+        mobile = user.get('mobilePhone', '') or ''
+        position = user.get('position', '') or ''
+        operational = user.get('OperationalAuthorities', '') or ''
+        electrical = user.get('electrical_safety_level', '') or ''
+        parent_energy = user.get('parent_energy', '') or ''
 
-        # Email
         email_block = f'''
 <cim:Person.electronicAddress>
     <cim:ElectronicAddress>
@@ -141,7 +162,6 @@ def generate_energy_xml(users_data: List[Dict]) -> str:
     </cim:ElectronicAddress>
 </cim:Person.electronicAddress>''' if email else ''
 
-        # Phone
         phone_block = f'''
 <cim:Person.mobilePhone>
     <cim:TelephoneNumber>
@@ -149,25 +169,20 @@ def generate_energy_xml(users_data: List[Dict]) -> str:
     </cim:TelephoneNumber>
 </cim:Person.mobilePhone>''' if mobile else ''
 
-        # Position
         position_block = f'<me:Person.Position rdf:resource="#_{position}"/>' if position else ''
 
-        # Operational Authorities
-        operational_blocks = ''
-        if operational:
-            for uid in filter(None, [u.strip() for u in operational.split('!')]):
-                operational_blocks += f'    <me:Person.OperationalAuthorities rdf:resource="#_{uid}" />\n'
+        operational_blocks = ''.join(
+            f'    <me:Person.OperationalAuthorities rdf:resource="#_{u.strip()}" />\n'
+            for u in operational.split('!') if u.strip()
+        )
 
-        # Electrical Safety
         electrical_block = f'<me:Person.ElectricalSafetyLevel rdf:resource="#_{electrical}"/>' if electrical else ''
 
-        # ФИО
         fio = name.strip().split()
         fio_last = fio[0] if len(fio) >= 1 else ''
         fio_first = fio[1] if len(fio) >= 2 else ''
         fio_middle = fio[2] if len(fio) >= 3 else ''
 
-        # Аббревиатура: Иванов И.П.
         abbreviation = fio_last
         if fio_first:
             abbreviation += ' ' + fio_first[0] + '.'
@@ -202,86 +217,90 @@ def generate_energy_xml(users_data: List[Dict]) -> str:
     return xml
 
 # --- Основной процесс ---
-
 def main():
-    print("Выберите режим:")
+    logger.info("🚀 Запуск скрипта преобразования CSV → CIM XML")
+
+    print("\n" + "="*60)
+    print("РЕЖИМ ОБРАБОТКИ")
     print("Y — использовать AD для получения GUID по логину")
-    print("N — использовать GUID из CSV (или генерировать)")
-    mode = input("Выбор (y/n): ").strip().lower()
+    print("N — использовать GUID из CSV (или ввести вручную)")
+    print("="*60)
+
+    mode = input("Выберите режим (y/n): ").strip().lower()
+    while mode not in ('y', 'n'):
+        mode = input("Введите 'y' или 'n': ").strip().lower()
 
     ad_guid = None
     ad_conn = None
     not_found_in_ad = []
 
-    if mode == 'y':
-        # Подключаемся к AD, получаем доменный GUID
-        ad_conn = connect_to_ad()
+    if mode == 'y' and AD_ENABLED:
+        password = getpass.getpass("🔐 Введите пароль AD: ")
+        ad_conn = connect_to_ad(password)
         if not ad_conn:
-            print("❌ Не удалось подключиться к AD. Завершаем.")
+            logger.error("❌ Не удалось подключиться к AD. Работа завершена.")
             return
 
-        # Получаем GUID домена
-        ad_conn.search(
-            search_base=DOMAIN_DN,
-            search_filter='(objectClass=domainDNS)',
-            attributes=['objectGUID']
-        )
-        if len(ad_conn.entries) > 0:
-            guid_bytes = ad_conn.entries[0].objectGUID.raw_values[0]
-            ad_guid = str(uuid.UUID(bytes_le=guid_bytes)).upper()
-        else:
-            print("❌ Не удалось получить GUID домена.")
+        try:
+            ad_conn.search(
+                search_base=DOMAIN_DN,
+                search_filter='(objectClass=domainDNS)',
+                attributes=['objectGUID']
+            )
+            if ad_conn.entries:
+                guid_bytes = ad_conn.entries[0].objectGUID.raw_values[0]
+                ad_guid = str(uuid.UUID(bytes_le=guid_bytes)).upper()
+                logger.info(f"✅ GUID домена из AD: {ad_guid}")
+            else:
+                logger.error("❌ Не удалось получить GUID домена.")
+                return
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения GUID домена: {e}")
             return
-        print(f"GUID домена (adGuid) из AD: {ad_guid}")
     else:
-        ad_guid = input("Введите GUID домена (adGuid): ").strip()
+        ad_guid_input = input("Введите GUID домена (adGuid): ").strip()
+        ad_guid = ad_guid_input.upper()
+        logger.info(f"✅ Используется вручную введённый GUID домена: {ad_guid}")
 
-    # Обработка CSV-файлов
-    current_dir = os.getcwd()
+    # --- Поиск CSV-файлов ---
     csv_files = [
-        f for f in os.listdir(current_dir)
-        if f.lower().endswith('.csv') and f != 'Sample.csv'
+        f for f in os.listdir('.')
+        if f.lower().endswith('.csv') and f != 'Sample.csv' and f != NOT_IN_AD_CSV
     ]
 
     if not csv_files:
-        print("❌ Нет подходящих CSV-файлов для обработки.")
+        logger.warning("⚠️ Нет подходящих CSV-файлов для обработки.")
         return
 
+    # --- Обработка каждого файла ---
     for csv_file in csv_files:
-        file_path = os.path.join(current_dir, csv_file)
-        print(f"\n🔄 Обработка файла: {csv_file}")
+        file_path = os.path.join('.', csv_file)
+        logger.info(f"🔄 Обработка файла: {csv_file}")
 
-        # Определяем кодировку и читаем
-        encoding = detect_encoding(file_path)
-        print(f"Кодировка: {encoding}")
+        encoding = get_file_encoding(file_path)
+        logger.debug(f"Определена кодировка: {encoding}")
 
-        with open(file_path, 'r', encoding=encoding) as f:
-            first_line = f.readline()
-            f.seek(0)
-            delimiter = detect_delimiter(first_line)
-            reader = csv.DictReader(f, delimiter=delimiter)
-            rows = list(reader)
+        try:
+            with open(file_path, 'r', encoding=encoding) as f:
+                first_line = f.readline()
+                f.seek(0)
+                delimiter = DELIMITER if DELIMITER in first_line else (',' if ',' in first_line else ';')
+                reader = csv.DictReader(f, delimiter=delimiter)
+                rows = list(reader)
+        except Exception as e:
+            logger.error(f"❌ Ошибка чтения {csv_file}: {e}")
+            continue
 
         updated_rows = []
         users_data = []
 
         for row in rows:
-            person_guid = row.get('person_guid', '').strip()
-            name = row.get('name', '').strip()
-            login = row.get('login', '').strip()
-            email = row.get('email', '').strip()
-            mobile = row.get('mobilePhone', '').strip()
-            position = row.get('position', '').strip()
-            operational = row.get('OperationalAuthorities', '').strip()
-            electrical = row.get('electrical_safety_level', '').strip()
-            roles = row.get('roles', '').strip()
-            groups = row.get('groups', '').strip()
-            parent_energy = row.get('parent_energy', '').strip()
-            parent_sysconfig = row.get('parent_sysconfig', '').strip()
-
+            name = (row.get('name') or '').strip()
             if not name:
                 continue
 
+            person_guid = (row.get('person_guid') or '').strip()
+            login = (row.get('login') or '').strip()
             mark_not_found = False
 
             if mode == 'y' and ad_conn:
@@ -306,54 +325,62 @@ def main():
                 if not person_guid:
                     person_guid = str(uuid.uuid4()).upper()
 
-            # Сохраняем обновлённую строку
             updated_row = {
                 'person_guid': person_guid,
                 'name': name,
                 'login': login,
-                'email': email,
-                'mobilePhone': mobile,
-                'position': position,
-                'OperationalAuthorities': operational,
-                'electrical_safety_level': electrical,
-                'roles': roles,
-                'groups': groups,
-                'parent_energy': parent_energy,
-                'parent_sysconfig': parent_sysconfig
+                'email': row.get('email', ''),
+                'mobilePhone': row.get('mobilePhone', ''),
+                'position': row.get('position', ''),
+                'OperationalAuthorities': row.get('OperationalAuthorities', ''),
+                'electrical_safety_level': row.get('electrical_safety_level', ''),
+                'roles': row.get('roles', ''),
+                'groups': row.get('groups', ''),
+                'parent_energy': row.get('parent_energy', ''),
+                'parent_sysconfig': row.get('parent_sysconfig', '')
             }
             updated_rows.append(updated_row)
             users_data.append(updated_row)
 
-        # Генерация XML
-        sysconfig_xml = generate_sysconfig_xml(ad_guid, users_data)
-        energy_xml = generate_energy_xml(users_data)
+        # --- Генерация XML ---
+        try:
+            base_name = os.path.splitext(csv_file)[0]
+            sys_xml = generate_sysconfig_xml(ad_guid, users_data)
+            energy_xml = generate_energy_xml(users_data)
 
-        # Сохранение XML
-        base_name = os.path.splitext(csv_file)[0]
-        with open(f"{base_name}.sysconfig.xml", 'w', encoding='utf-8') as f:
-            f.write(sysconfig_xml)
-        with open(f"{base_name}.energy.xml", 'w', encoding='utf-8') as f:
-            f.write(energy_xml)
+            with open(f"{base_name}{SYSCONFIG_SUFFIX}", 'w', encoding='utf-8') as f:
+                f.write(sys_xml)
+            with open(f"{base_name}{ENERGY_SUFFIX}", 'w', encoding='utf-8') as f:
+                f.write(energy_xml)
 
-        # Перезапись CSV с обновлёнными GUID
-        with open(file_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=updated_rows[0].keys(), delimiter=delimiter)
-            writer.writeheader()
-            writer.writerows(updated_rows)
+            logger.info(f"✅ Созданы XML: {base_name}{SYSCONFIG_SUFFIX}, {base_name}{ENERGY_SUFFIX}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка генерации XML: {e}")
+            continue
 
-        print(f"✅ Созданы: {base_name}.energy.xml, {base_name}.sysconfig.xml, обновлён {csv_file}")
+        # --- Перезапись CSV ---
+        try:
+            with open(file_path, 'w', newline='', encoding=INPUT_ENCODING) as f:
+                writer = csv.DictWriter(f, fieldnames=updated_rows[0].keys(), delimiter=DELIMITER)
+                writer.writeheader()
+                writer.writerows(updated_rows)
+            logger.info(f"✅ Обновлён CSV: {csv_file}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка записи CSV: {e}")
 
-    # Сохраняем not_in_AD.csv
+    # --- Сохранение not_in_AD.csv ---
     if mode == 'y' and not_found_in_ad:
-        not_found_in_ad.sort(key=lambda x: x['login'])
-        with open('not_in_AD.csv', 'w', newline='', encoding='utf-8') as f:
-            fieldnames = ['login', 'name', 'person_guid']
-            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=';')
-            writer.writeheader()
-            writer.writerows(not_found_in_ad)
-        print("\n🟡 Логины, не найденные в AD, сохранены в `not_in_AD.csv`")
+        try:
+            not_found_in_ad.sort(key=lambda x: x['login'])
+            with open(NOT_IN_AD_CSV, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=['login', 'name', 'person_guid'], delimiter=';')
+                writer.writeheader()
+                writer.writerows(not_found_in_ad)
+            logger.warning(f"🟡 Логины не из AD сохранены в: {NOT_IN_AD_CSV}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка записи not_in_AD.csv: {e}")
 
-    print("\n✅ Обработка завершена. Все person_guid записаны в исходные CSV!")
+    logger.info("✅ Обработка завершена.")
 
 if __name__ == "__main__":
-    main()
+    main()# main.py
