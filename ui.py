@@ -12,6 +12,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSettings
 from PyQt5.QtGui import QTextCursor, QFont
+import logging
+import traceback
 
 # Импортируем логику приложения
 try:
@@ -29,7 +31,6 @@ try:
     from csv_processing import get_file_encoding, read_csv_file, write_csv_file
     # Импортируем AD функции
     from ad_operations import get_user_guid
-    
 except ImportError as e:
     print(f"Ошибка импорта: {e}")
     QMessageBox.critical(None, "Ошибка", f"Не удалось импортировать необходимые модули: {e}")
@@ -41,6 +42,15 @@ ENERGY_SUFFIX = CONFIG['output']['energy_xml_suffix']
 NOT_IN_AD_CSV = CONFIG['output']['not_in_ad_csv']
 AD_ENABLED = CONFIG['ad']['enabled']
 
+# Настройка логгера для UI
+ui_logger = logging.getLogger("UserCreatorUI")
+ui_logger.setLevel(logging.DEBUG)
+
+# Создаем обработчик для логов UI (можно сохранять в отдельный файл)
+# ui_handler = logging.FileHandler('ui.log', encoding='utf-8')
+# ui_formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(name)s] - %(message)s')
+# ui_handler.setFormatter(ui_formatter)
+# ui_logger.addHandler(ui_handler)
 
 class Worker(QThread):
     """Поток для выполнения основной логики обработки."""
@@ -48,73 +58,112 @@ class Worker(QThread):
     progress_signal = pyqtSignal(int)
     finished_signal = pyqtSignal()
     error_signal = pyqtSignal(str)
-    
+
     def __init__(self, mode, ad_password, manual_guid, input_dir):
         super().__init__()
         self.mode = mode
         self.ad_password = ad_password
         self.manual_guid = manual_guid
         self.input_dir = input_dir
-        
+        self.logger = logging.getLogger("UserCreatorUI.Worker")
+
     def run(self):
         """Выполняет обработку в отдельном потоке."""
         try:
+            self.logger.info("Начало выполнения рабочего потока")
+            self.log_signal.emit("🚀 Начало выполнения рабочего потока")
+            
             # Меняем директорию
             original_dir = os.getcwd()
+            self.logger.debug(f"Исходная директория: {original_dir}")
+            
             if self.input_dir and os.path.exists(self.input_dir):
                 os.chdir(self.input_dir)
+                self.logger.info(f"Рабочая директория изменена на: {os.getcwd()}")
+            else:
+                self.logger.warning(f"Указанная директория не существует: {self.input_dir}. Используется текущая.")
                 
-            self.log_signal.emit(f"Начало обработки в директории: {os.getcwd()}")
-            
+            self.log_signal.emit(f"📂 Рабочая директория: {os.getcwd()}")
+
             # Инициализация AD (если нужно)
             ad_conn = None
             ad_guid = None
             not_found_in_ad = []
             
             if self.mode == 'y' and AD_ENABLED:
+                self.logger.info("Выбран режим работы с Active Directory")
                 if not self.ad_password:
-                    self.log_signal.emit("❌ Не введен пароль AD!")
+                    error_msg = "❌ Не введен пароль AD!"
+                    self.logger.error(error_msg)
+                    self.log_signal.emit(error_msg)
                     return
-                self.log_signal.emit("Подключение к Active Directory...")
+                    
+                self.log_signal.emit("🔐 Подключение к Active Directory...")
+                self.logger.info(f"Попытка подключения к AD: сервер={CONFIG['ad']['domain_controller']}, пользователь={CONFIG['ad']['user']}")
+                
                 ad_conn = connect_to_ad(self.ad_password)
                 if not ad_conn:
-                    self.log_signal.emit("❌ Не удалось подключиться к AD.")
+                    error_msg = "❌ Не удалось подключиться к AD."
+                    self.logger.error(error_msg)
+                    self.log_signal.emit(error_msg)
                     return
+                    
+                self.logger.info("✅ Успешное подключение к Active Directory")
                 self.log_signal.emit("✅ Подключено к AD")
                 
-                self.log_signal.emit("Получение GUID домена...")
+                self.log_signal.emit("📡 Получение GUID домена...")
+                self.logger.info("Получение GUID домена...")
+                
                 ad_guid = get_domain_guid(ad_conn)
                 if not ad_guid:
-                    self.log_signal.emit("❌ Не удалось получить GUID домена.")
+                    error_msg = "❌ Не удалось получить GUID домена."
+                    self.logger.error(error_msg)
+                    self.log_signal.emit(error_msg)
                     return
+                    
+                self.logger.info(f"✅ GUID домена успешно получен: {ad_guid}")
                 self.log_signal.emit(f"✅ GUID домена: {ad_guid}")
             else:
+                self.logger.info("Выбран режим работы без Active Directory (ручной ввод GUID)")
                 if not self.manual_guid:
-                    self.log_signal.emit("❌ Не введен GUID домена!")
+                    error_msg = "❌ Не введен GUID домена!"
+                    self.logger.error(error_msg)
+                    self.log_signal.emit(error_msg)
                     return
+                    
                 ad_guid = self.manual_guid.strip()
+                self.logger.info(f"Используется введенный GUID домена: {ad_guid}")
                 self.log_signal.emit(f"✅ Используется GUID: {ad_guid}")
-                
+
             self.progress_signal.emit(20)
-            self.log_signal.emit("Поиск CSV файлов...")
+            self.log_signal.emit("🔍 Поиск CSV файлов...")
+            self.logger.info("Начало поиска CSV файлов")
             
             csv_files = find_csv_files()
             if not csv_files:
-                self.log_signal.emit("⚠️ Нет подходящих CSV-файлов для обработки.")
+                warning_msg = "⚠️ Нет подходящих CSV-файлов для обработки."
+                self.logger.warning(warning_msg)
+                self.log_signal.emit(warning_msg)
                 return
                 
-            self.log_signal.emit(f"Найдено файлов для обработки: {len(csv_files)}")
+            self.logger.info(f"Найдено файлов для обработки: {len(csv_files)}")
+            self.log_signal.emit(f"📄 Найдено файлов для обработки: {len(csv_files)}")
             
+            for i, csv_file in enumerate(csv_files):
+                self.logger.info(f"Обнаружен файл для обработки: {csv_file}")
+
             self.progress_signal.emit(30)
             total_files = len(csv_files)
             
             # Обработка файлов
             for i, csv_file in enumerate(csv_files):
-                self.log_signal.emit(f"Обработка файла: {csv_file}")
+                self.logger.info(f"Начало обработки файла {i+1}/{total_files}: {csv_file}")
+                self.log_signal.emit(f"📄 Обработка файла ({i+1}/{total_files}): {csv_file}")
                 
                 try:
                     file_path = os.path.join('.', csv_file)
                     base_name = os.path.splitext(csv_file)[0]
+                    self.logger.debug(f"Полный путь к файлу: {file_path}")
                     
                     # Создаём LogManager и получаем логгер
                     log_manager = LogManager(csv_file)
@@ -127,15 +176,21 @@ class Worker(QThread):
                         logger.info(f"✅ Используется вручную введённый GUID домена: {ad_guid}")
                     
                     # Определение кодировки и чтение CSV
+                    self.logger.debug(f"Определение кодировки файла: {file_path}")
                     encoding = get_file_encoding(file_path)
                     logger.info(f"Определена кодировка: {encoding}")
+                    self.logger.info(f"Кодировка файла {csv_file}: {encoding}")
+                    
+                    self.logger.debug(f"Чтение CSV файла: {file_path}")
                     rows = read_csv_file(file_path, encoding)
                     logger.info(f"Прочитано строк: {len(rows)}")
+                    self.logger.info(f"Прочитано {len(rows)} строк из файла {csv_file}")
                     
                     updated_rows = []
                     users_data = []
                     
-                                        # ...
+                    self.logger.debug(f"Начало обработки строк из файла {csv_file}")
+                    
                     for row_idx, row in enumerate(rows):
                         name = (row.get('name') or '').strip()
                         if not name:
@@ -153,43 +208,64 @@ class Worker(QThread):
                             not_found_in_ad, # not_found_in_ad
                             logger         # logger
                         )
-                        # ...
-                        
-                        
-                            
-                            
-                            
                         
                         if processed_row:
                             updated_rows.append(processed_row)
                             users_data.append(processed_row)
-                    
+                            
+                    self.logger.info(f"Обработано {len(users_data)} записей из файла {csv_file}")
+                    self.log_signal.emit(f"  ✅ Обработано записей: {len(users_data)}")
+
                     # Генерация XML
+                    self.logger.info(f"Начало генерации XML файлов для {csv_file}")
+                    self.log_signal.emit(f"  📄 Генерация XML файлов...")
+                    
                     sys_xml = generate_sysconfig_xml(ad_guid, users_data)
                     energy_xml = generate_energy_xml(users_data)
-                    with open(f"{base_name}{SYSCONFIG_SUFFIX}", 'w', encoding='utf-8') as f:
-                        f.write(sys_xml)
-                    with open(f"{base_name}{ENERGY_SUFFIX}", 'w', encoding='utf-8') as f:
-                        f.write(energy_xml)
-                    logger.info(f"✅ Успешно сгенерированы XML-файлы: "
-                               f"{base_name}{SYSCONFIG_SUFFIX}, {base_name}{ENERGY_SUFFIX}")
                     
+                    sys_xml_filename = f"{base_name}{SYSCONFIG_SUFFIX}"
+                    energy_xml_filename = f"{base_name}{ENERGY_SUFFIX}"
+                    
+                    self.logger.debug(f"Запись SysConfig XML: {sys_xml_filename}")
+                    with open(sys_xml_filename, 'w', encoding='utf-8') as f:
+                        f.write(sys_xml)
+                        
+                    self.logger.debug(f"Запись Energy XML: {energy_xml_filename}")
+                    with open(energy_xml_filename, 'w', encoding='utf-8') as f:
+                        f.write(energy_xml)
+                        
+                    logger.info(f"✅ Успешно сгенерированы XML-файлы: "
+                               f"{sys_xml_filename}, {energy_xml_filename}")
+                    self.logger.info(f"XML файлы успешно созданы: {sys_xml_filename}, {energy_xml_filename}")
+                    self.log_signal.emit(f"  ✅ XML файлы созданы: {SYSCONFIG_SUFFIX}, {ENERGY_SUFFIX}")
+
                     # Перезапись CSV
+                    self.logger.debug(f"Перезапись CSV файла: {file_path}")
                     write_csv_file(file_path, updated_rows)
                     logger.info(f"✅ CSV файл обновлён и сохранён: {csv_file}")
-                    
+                    self.logger.info(f"CSV файл успешно обновлён: {csv_file}")
+                    self.log_signal.emit(f"  ✅ CSV файл обновлён")
+
                     logger.info(f"✅ Обработка файла '{csv_file}' завершена.")
+                    self.logger.info(f"Обработка файла {csv_file} завершена успешно")
                     
                 except Exception as e:
-                    self.log_signal.emit(f"❌ Ошибка обработки файла {csv_file}: {str(e)}")
+                    error_msg = f"❌ Ошибка обработки файла {csv_file}: {str(e)}"
+                    self.logger.error(error_msg)
+                    self.logger.debug(f"Детали ошибки: {traceback.format_exc()}")
+                    self.log_signal.emit(error_msg)
                     continue
                     
                 # Обновляем прогресс
                 progress = 30 + int((i + 1) / total_files * 60)
                 self.progress_signal.emit(progress)
-                
+                self.logger.debug(f"Прогресс обработки: {progress}%")
+
             # --- Сохранение not_in_AD.csv ---
             if self.mode == 'y' and AD_ENABLED and not_found_in_ad:
+                self.logger.info(f"Сохранение списка пользователей не найденных в AD: {len(not_found_in_ad)} записей")
+                self.log_signal.emit(f"💾 Сохранение списка пользователей не найденных в AD ({len(not_found_in_ad)} записей)...")
+                
                 try:
                     not_found_in_ad.sort(key=lambda x: x['login'])
                     with open(NOT_IN_AD_CSV, 'w', newline='', encoding='utf-8') as f:
@@ -197,50 +273,73 @@ class Worker(QThread):
                         writer = csv.DictWriter(f, fieldnames=['login', 'name', 'person_guid'], delimiter=';')
                         writer.writeheader()
                         writer.writerows(not_found_in_ad)
+                        
                     if csv_files:
                         last_logger = logger  # Используем последний логгер
                         last_logger.warning(f"🟡 Логины не из AD сохранены в: {NOT_IN_AD_CSV}")
+                        
                     self.log_signal.emit(f"✅ Логины не из AD сохранены в: {NOT_IN_AD_CSV}")
+                    self.logger.info(f"Список пользователей не найденных в AD успешно сохранен в: {NOT_IN_AD_CSV}")
+                    
                 except Exception as e:
                     if csv_files:
                         last_logger = logger
                         last_logger.error(f"❌ Ошибка записи {NOT_IN_AD_CSV}: {e}")
-                    self.log_signal.emit(f"❌ Ошибка записи {NOT_IN_AD_CSV}: {e}")
-            
-            self.log_signal.emit("✅ Обработка завершена!")
+                        
+                    error_msg = f"❌ Ошибка записи {NOT_IN_AD_CSV}: {e}"
+                    self.logger.error(error_msg)
+                    self.logger.debug(f"Детали ошибки: {traceback.format_exc()}")
+                    self.log_signal.emit(error_msg)
+
+            success_msg = "✅ Обработка всех файлов завершена!"
+            self.logger.info(success_msg)
+            self.log_signal.emit(success_msg)
             self.progress_signal.emit(100)
             self.finished_signal.emit()
             
             # Возвращаемся в исходную директорию
             os.chdir(original_dir)
+            self.logger.info(f"Возвращение в исходную директорию: {original_dir}")
             
         except Exception as e:
-            self.error_signal.emit(f"❌ Ошибка: {str(e)}")
+            error_msg = f"❌ Критическая ошибка в рабочем потоке: {str(e)}"
+            self.logger.error(error_msg)
+            self.logger.debug(f"Детали ошибки: {traceback.format_exc()}")
+            self.error_signal.emit(error_msg)
             self.finished_signal.emit()
-
 
 class UserCreatorWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.logger = logging.getLogger("UserCreatorUI.MainWindow")
+        self.logger.info("Инициализация главного окна приложения")
+        
         self.settings = QSettings('UserCreator', 'GUI')
         self.worker = None
         self.init_ui()
         self.load_settings()
         
+        self.logger.info("Главное окно приложения инициализировано")
+
     def init_ui(self):
         """Инициализирует пользовательский интерфейс."""
+        self.logger.debug("Начало инициализации UI")
+        
         self.setWindowTitle("User Creator GUI")
         self.setGeometry(100, 100, 900, 700)
-        
+        self.logger.debug("Установлены параметры окна")
+
         # Центральный виджет
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        
+        self.logger.debug("Создан центральный виджет")
+
         # --- Панель настроек ---
         settings_group = QGroupBox("Настройки обработки")
         settings_layout = QVBoxLayout(settings_group)
-        
+        self.logger.debug("Создана панель настроек")
+
         # Режим работы
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(QLabel("Режим обработки:"))
@@ -252,36 +351,35 @@ class UserCreatorWindow(QMainWindow):
         if not AD_ENABLED:
             self.radio_ad.setEnabled(False)
             self.radio_ad.setToolTip("AD отключен в config.json")
+            self.logger.warning("Режим AD отключен в конфигурации")
             
         mode_layout.addWidget(self.radio_ad)
         mode_layout.addWidget(self.radio_manual)
         mode_layout.addStretch()
         settings_layout.addLayout(mode_layout)
-        
+        self.logger.debug("Настроены радиокнопки режима работы")
+
         # Поля для AD
         self.ad_widget = QFrame()
         self.ad_widget.setFrameStyle(QFrame.StyledPanel)
         ad_layout = QFormLayout(self.ad_widget)
-        
         self.ad_password_edit = QLineEdit()
         self.ad_password_edit.setEchoMode(QLineEdit.Password)
         ad_layout.addRow("Пароль AD:", self.ad_password_edit)
-        
         settings_layout.addWidget(self.ad_widget)
-        
+        self.logger.debug("Созданы поля для ввода данных AD")
+
         # Поле для ручного GUID
         self.manual_guid_widget = QFrame()
         self.manual_guid_widget.setFrameStyle(QFrame.StyledPanel)
         manual_guid_layout = QFormLayout(self.manual_guid_widget)
-        
         self.manual_guid_edit = QLineEdit()
         manual_guid_layout.addRow("GUID домена:", self.manual_guid_edit)
-        
         settings_layout.addWidget(self.manual_guid_widget)
-        
+        self.logger.debug("Созданы поля для ручного ввода GUID")
+
         # Директории
         dirs_layout = QFormLayout()
-        
         dir_input_layout = QHBoxLayout()
         self.input_dir_edit = QLineEdit(".")
         self.browse_input_button = QPushButton("Обзор...")
@@ -289,105 +387,123 @@ class UserCreatorWindow(QMainWindow):
         dir_input_layout.addWidget(self.input_dir_edit)
         dir_input_layout.addWidget(self.browse_input_button)
         dirs_layout.addRow("Директория с CSV:", dir_input_layout)
-        
         settings_layout.addLayout(dirs_layout)
-        
+        self.logger.debug("Настроены поля выбора директории")
+
         main_layout.addWidget(settings_group)
-        
+
         # --- Кнопка запуска ---
         self.run_button = QPushButton("▶ Запустить обработку")
         self.run_button.clicked.connect(self.run_processing)
         self.run_button.setStyleSheet("font-weight: bold; padding: 10px;")
         main_layout.addWidget(self.run_button)
-        
+        self.logger.debug("Создана кнопка запуска обработки")
+
         # --- Прогресс и логи ---
         progress_group = QGroupBox("Прогресс и логи")
         progress_layout = QVBoxLayout(progress_group)
-        
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
         progress_layout.addWidget(self.progress_bar)
-        
+        self.logger.debug("Создан индикатор прогресса")
+
         # Область логов с прокруткой
         log_container = QWidget()
         log_layout = QVBoxLayout(log_container)
-        
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         # Установка моноширинного шрифта для логов
         font = QFont("Courier New")
         font.setPointSize(9)
         self.log_text.setFont(font)
-        
         log_layout.addWidget(self.log_text)
-        
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(log_container)
         scroll_area.setMinimumHeight(300)
-        
         progress_layout.addWidget(scroll_area)
-        
         main_layout.addWidget(progress_group)
-        
+        self.logger.debug("Создана область отображения логов")
+
         # --- Статус бар ---
         self.statusBar().showMessage("Готов к обработке")
-        
+        self.logger.debug("Инициализирован статус бар")
+
         # Подключаем сигналы для изменения режима
         self.radio_ad.toggled.connect(self.on_mode_change)
         self.radio_manual.toggled.connect(self.on_mode_change)
         self.on_mode_change()
         
+        self.logger.info("Интерфейс полностью инициализирован")
+
     def on_mode_change(self):
         """Обработчик изменения режима работы."""
+        self.logger.debug("Изменение режима работы")
+        
         if self.radio_ad.isChecked():
             self.ad_widget.setVisible(True)
             self.manual_guid_widget.setVisible(False)
+            self.logger.info("Выбран режим работы с AD")
         else:
             self.ad_widget.setVisible(False)
             self.manual_guid_widget.setVisible(True)
-            
+            self.logger.info("Выбран режим работы без AD (ручной)")
+
     def browse_input_directory(self):
         """Открывает диалог выбора директории."""
+        self.logger.debug("Открытие диалога выбора директории")
+        
         dir_path = QFileDialog.getExistingDirectory(self, "Выберите директорию с CSV")
         if dir_path:
             self.input_dir_edit.setText(dir_path)
-            
+            self.logger.info(f"Выбрана директория: {dir_path}")
+
     def log_message(self, message: str):
         """Добавляет сообщение в лог."""
+        self.logger.debug(f"Добавление сообщения в UI лог: {message}")
         self.log_text.append(message)
         # Прокручиваем вниз
         self.log_text.moveCursor(QTextCursor.End)
-        
+
     def run_processing(self):
         """Запускает обработку."""
+        self.logger.info("Начало запуска процесса обработки")
+        
         # Сохраняем настройки
         self.save_settings()
-        
+        self.logger.debug("Настройки сохранены")
+
         mode = 'y' if self.radio_ad.isChecked() else 'n'
         ad_password = self.ad_password_edit.text()
         manual_guid = self.manual_guid_edit.text()
         input_dir = self.input_dir_edit.text()
         
+        self.logger.info(f"Параметры запуска: режим={mode}, директория={input_dir}")
+
         # Валидация
         if mode == 'y' and AD_ENABLED and not ad_password:
+            self.logger.warning("Попытка запуска без введенного пароля AD")
             QMessageBox.warning(self, "Внимание", "Пожалуйста, введите пароль AD.")
             return
             
         if mode == 'n' or not AD_ENABLED:
             if not manual_guid:
+                self.logger.warning("Попытка запуска без введенного GUID")
                 QMessageBox.warning(self, "Внимание", "Пожалуйста, введите GUID домена.")
                 return
                 
         if not input_dir or not os.path.exists(input_dir):
+            self.logger.warning(f"Указана несуществующая директория: {input_dir}")
             QMessageBox.warning(self, "Внимание", "Пожалуйста, выберите существующую директорию с CSV файлами.")
             return
-            
+
         self.run_button.setEnabled(False)
         self.statusBar().showMessage("Обработка запущена...")
         self.progress_bar.setValue(0)
         self.log_text.clear()
         
+        self.logger.info("Все проверки пройдены, запуск рабочего потока")
+
         # Создаем и запускаем поток обработки
         self.worker = Worker(mode, ad_password, manual_guid, input_dir)
         self.worker.log_signal.connect(self.log_message)
@@ -396,25 +512,35 @@ class UserCreatorWindow(QMainWindow):
         self.worker.error_signal.connect(self.on_processing_error)
         self.worker.start()
         
+        self.logger.info("Рабочий поток запущен")
+
     def on_processing_finished(self):
         """Обработчик завершения обработки."""
+        self.logger.info("Обработка завершена успешно")
         self.run_button.setEnabled(True)
         self.statusBar().showMessage("Обработка завершена")
         self.log_message("=== Обработка завершена ===")
-        
+
     def on_processing_error(self, error_message: str):
         """Обработчик ошибок во время обработки."""
+        self.logger.error(f"Ошибка во время обработки: {error_message}")
         self.run_button.setEnabled(True)
         self.statusBar().showMessage("Ошибка во время обработки")
         QMessageBox.critical(self, "Ошибка", error_message)
-        
+
     def save_settings(self):
         """Сохраняет настройки в реестр."""
+        self.logger.debug("Сохранение настроек")
+        
         self.settings.setValue("mode", 'y' if self.radio_ad.isChecked() else 'n')
         self.settings.setValue("input_dir", self.input_dir_edit.text())
         
+        self.logger.info("Настройки успешно сохранены")
+
     def load_settings(self):
         """Загружает настройки из реестра."""
+        self.logger.debug("Загрузка настроек")
+        
         mode = self.settings.value("mode", 'n')
         if mode == 'y' and AD_ENABLED:
             self.radio_ad.setChecked(True)
@@ -424,35 +550,59 @@ class UserCreatorWindow(QMainWindow):
         input_dir = self.settings.value("input_dir", ".")
         self.input_dir_edit.setText(input_dir)
         
+        self.logger.info(f"Настройки загружены: режим={mode}, директория={input_dir}")
+
     def closeEvent(self, event):
         """Обработчик закрытия приложения."""
+        self.logger.info("Получен запрос на закрытие приложения")
+        
         if self.worker and self.worker.isRunning():
+            self.logger.warning("Попытка закрытия приложения во время выполнения задачи")
+            
             reply = QMessageBox.question(
                 self, "Подтверждение выхода",
                 "Идет обработка. Вы уверены, что хотите выйти?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )
+            
             if reply == QMessageBox.Yes:
+                self.logger.info("Пользователь подтвердил закрытие приложения")
                 self.worker.terminate()
                 self.worker.wait()
                 event.accept()
             else:
+                self.logger.info("Пользователь отменил закрытие приложения")
                 event.ignore()
         else:
+            self.logger.info("Приложение закрывается")
             event.accept()
 
-
 def main():
-    app = QApplication(sys.argv)
+    # Настройка логгера для основного приложения
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s [%(levelname)s] [%(name)s] - %(message)s',
+        handlers=[
+            logging.FileHandler('user_creator_ui.log', encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
     
+    main_logger = logging.getLogger("UserCreatorUI")
+    main_logger.info("Запуск приложения User Creator GUI")
+    
+    app = QApplication(sys.argv)
     # Установка стиля
     app.setStyle("Fusion")
-    
     window = UserCreatorWindow()
     window.show()
-    sys.exit(app.exec_())
-
+    
+    main_logger.info("Главное окно отображено")
+    exit_code = sys.exit(app.exec_())
+    
+    main_logger.info("Приложение завершено")
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
     main()
