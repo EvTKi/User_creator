@@ -16,7 +16,7 @@
       "delimiter": ";"
     },
     "xml": {
-      "model_version_sysconfig": "1.0",
-      "model_version_energy": "1.0"
+      "model_version_sysconfig": "2025-03-04(11.7.1.7)",
+      "model_version_energy": "ver:11.6.2.193;opt:Aggr,AMI,..."
     }
   }

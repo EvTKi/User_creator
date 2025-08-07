@@ -1,78 +1,65 @@
-# logging_config.py
 """
 Модуль для настройки логирования приложения.
-Создаёт отдельный лог-файл для каждого обрабатываемого CSV.
 """
-
 import logging
 import os
-import json
 from datetime import datetime
 from typing import Optional
 
+# Импортируем конфигурацию
+from config_loader import CONFIG
+
+# Настройка директории логов из config.json
+log_dir = CONFIG['output']['log_dir']
+os.makedirs(log_dir, exist_ok=True)
 
 class LogManager:
     """
-    Класс для управления логированием.
-    Настройка логгера для каждого CSV-файла отдельно.
+    Менеджер логирования, использующий log_dir из config.json.
+    Создаёт отдельный лог-файл для каждого CSV.
     """
 
-    def __init__(self, csv_filename: str, config_path: str = 'config.json'):
+    def __init__(self, csv_filename: str, log_level: int = logging.INFO):
         """
         Инициализирует LogManager.
-
+        
         Args:
             csv_filename (str): Имя обрабатываемого CSV-файла.
-            config_path (str): Путь к config.json.
+            log_level (int): Уровень логирования (по умолчанию logging.INFO).
         """
         self.csv_filename = csv_filename
-        self.config_path = config_path
-        self.log_dir = self._load_log_dir()
-        self.logger = self._setup_logger()
+        self.log_level = log_level
+        self.log_file = self._setup_logging()
 
-    def _load_log_dir(self) -> str:
-        """Загружает log_dir из config.json."""
-        if not os.path.exists(self.config_path):
-            raise FileNotFoundError(f"Конфигурационный файл не найден: {self.config_path}")
-
-        with open(self.config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-
-        log_dir = config['output']['log_dir']
-        os.makedirs(log_dir, exist_ok=True)
-        return log_dir
-
-    def _setup_logger(self) -> logging.Logger:
-        """Настраивает и возвращает логгер для текущего CSV-файла."""
-        base_name = os.path.splitext(os.path.basename(self.csv_filename))[0]
-        log_file = os.path.join(
-            self.log_dir,
-            f"{base_name}_{datetime.now().strftime('%Y-%m-%d')}.log"
-        )
-
-        # Создаём логгер с уникальным именем
-        logger = logging.getLogger(f"csv.{base_name}")
-        logger.setLevel(logging.INFO)
-
-        # Очищаем предыдущие обработчики, чтобы избежать дублирования
+    def _setup_logging(self) -> str:
+        """
+        Настраивает логирование для текущего CSV-файла.
+        
+        Returns:
+            str: Путь к созданному лог-файлу.
+        """
+        base = os.path.splitext(os.path.basename(self.csv_filename))[0]
+        date = datetime.now().strftime("%Y-%m-%d")
+        log_file = os.path.join(log_dir, f"{base}_{date}.log")
+        # Формат как в оригинальном коде
+        formatter = logging.Formatter('%(asctime)s [%(levelname)s] - %(message)s')
+        # Создаём новый логгер для файла
+        logger = logging.getLogger(base)
+        logger.setLevel(self.log_level)
+        # Очищаем старые обработчики, чтобы избежать дублирования
         if logger.hasHandlers():
             logger.handlers.clear()
-
-        # Формат лога
-        formatter = logging.Formatter('%(asctime)s [%(levelname)s] - %(message)s')
-
-        # Обработчик для записи в файл
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-        return logger
+        handler = logging.FileHandler(log_file, encoding='utf-8')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        return log_file
 
     def get_logger(self) -> logging.Logger:
         """
-        Возвращает настроенный логгер.
-
+        Возвращает настроенный логгер для текущего CSV-файла.
+        
         Returns:
             logging.Logger: Логгер для текущего CSV-файла.
         """
-        return self.logger
+        base = os.path.splitext(os.path.basename(self.csv_filename))[0]
+        return logging.getLogger(base)
