@@ -54,7 +54,7 @@ def get_config_path(filename: str) -> str:
         return config_path_near_exe
 
 # Определяем путь к config.json ДО определения функции load_config
-CONFIG_PATH = get_config_path('config.json')
+CONFIG_PATH = get_config_path('config/config.json')
 print(f"DEBUG (module level): CONFIG_PATH = {CONFIG_PATH}")
 
 def load_config() -> Dict[str, Any]:

@@ -62,15 +62,15 @@ def get_resource_path(filename: str) -> str:
 # Сначала попробуем загрузить config.json для получения log_dir
 # Используем новую функцию get_resource_path
 try:
-    config_json_path = get_resource_path('config.json')
-    print(f"DEBUG (logging_config, module load): Ищу config.json по пути: {config_json_path}")
-    if os.path.exists(config_json_path):
-        with open(config_json_path, 'r', encoding='utf-8') as f:
+    CONFIG_JSON_PATH = get_resource_path('config/config.json')
+    print(f"DEBUG (logging_config, module load): Ищу config.json по пути: {CONFIG_JSON_PATH}")
+    if os.path.exists(CONFIG_JSON_PATH):
+        with open(CONFIG_JSON_PATH, 'r', encoding='utf-8') as f:
             app_config = json.load(f)
         log_dir = app_config['output']['log_dir']
         print(f"DEBUG (logging_config, module load): Директория логов из config.json: {log_dir}")
     else:
-        raise FileNotFoundError(f"config.json not found at {config_json_path}")
+        raise FileNotFoundError(f"config.json not found at {CONFIG_JSON_PATH}")
 except Exception as e:
     print(f"WARNING (logging_config, module load): Не удалось загрузить config.json для определения log_dir: {e}")
     print("WARNING (logging_config, module load): Используется директория по умолчанию: 'logs'")
@@ -87,14 +87,14 @@ def setup_logging():
     и добавляет/заменяет файловые обработчики с именами, содержащими текущую дату.
     """
     # Определяем путь к logging_config.json
-    config_path = get_resource_path('logging_config.json')
+    LOGGING_CONFIG_JSON_PATH = get_resource_path('logging_config.json')
     today = datetime.now().strftime("%Y-%m-%d")
-    print(f"DEBUG (logging_config): Ищу logging_config.json по пути: {config_path}")
+    print(f"DEBUG (logging_config): Ищу logging_config.json по пути: {LOGGING_CONFIG_JSON_PATH}")
 
     # Загружаем базовую конфигурацию (форматтеры, консоль)
-    if os.path.exists(config_path):
+    if os.path.exists(LOGGING_CONFIG_JSON_PATH):
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(LOGGING_CONFIG_JSON_PATH, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
             # Имена файловых обработчиков, которые мы хотим заменить/удалить
@@ -121,19 +121,19 @@ def setup_logging():
 
             # Применяем модифицированную конфигурацию
             logging.config.dictConfig(config)
-            print(f"✅ Базовая конфигурация логгирования загружена из {config_path}")
+            print(f"✅ Базовая конфигурация логгирования загружена из {LOGGING_CONFIG_JSON_PATH}")
         except ValueError as e: # Перехватываем конкретную ошибку конфигурации
-            print(f"❌ Ошибка применения конфигурации из {config_path}: {e}")
+            print(f"❌ Ошибка применения конфигурации из {LOGGING_CONFIG_JSON_PATH}: {e}")
             print("Используется резервная настройка.")
             logging.basicConfig(level=logging.INFO)
         except Exception as e:
-            print(f"❌ Неизвестная ошибка при загрузке {config_path}: {e}")
+            print(f"❌ Неизвестная ошибка при загрузке {LOGGING_CONFIG_JSON_PATH}: {e}")
             print("Используется резервная настройка.")
             logging.basicConfig(level=logging.INFO)
             
     else:
         # Резервная настройка, если JSON не найден
-        print(f"⚠️ Файл конфигурации {config_path} не найден. Используется резервная настройка.")
+        print(f"⚠️ Файл конфигурации {LOGGING_CONFIG_JSON_PATH} не найден. Используется резервная настройка.")
         logging.basicConfig(level=logging.INFO)
 
     # --- Создание и настройка файлового обработчика для app.log с датой ---
@@ -234,7 +234,7 @@ class LogManager:
         formatter = None
         try:
             # Пытаемся загрузить формат из logging_config.json
-            config_path = get_resource_path('logging_config.json') # Используем нашу функцию
+            config_path = get_resource_path('config/logging_config.json') # Используем нашу функцию
             print(f"DEBUG (LogManager._setup_logging): Загрузка форматтера из '{config_path}' для логгера '{logger_name}'")
             if os.path.exists(config_path):
                 with open(config_path, 'r', encoding='utf-8') as f:
