@@ -25,7 +25,7 @@ import traceback
 # Импортируем модули проекта
 from config_loader import CONFIG
 from ad_operations import connect_to_ad, get_domain_guid
-from xml_generation import generate_sysconfig_xml, generate_energy_xml
+from xml_generation import generate_access_xml, generate_energy_xml
 from csv_processing import (
     find_csv_files, read_csv_file, write_csv_file, 
     process_user_row, get_file_encoding
@@ -39,8 +39,8 @@ AD_ENABLED = CONFIG['ad']['enabled']
 NOT_IN_AD_CSV = CONFIG['output']['not_in_ad_csv']
 """str: Имя файла для сохранения пользователей, не найденных в AD."""
 
-SYSCONFIG_SUFFIX = CONFIG['output']['sysconfig_xml_suffix']
-"""str: Суффикс для генерируемых XML-файлов SysConfig."""
+ACCESS_SUFFIX = CONFIG['output']['access_xml_suffix']
+"""str: Суффикс для генерируемых XML-файлов Access."""
 
 ENERGY_SUFFIX = CONFIG['output']['energy_xml_suffix']
 """str: Суффикс для генерируемых XML-файлов Energy."""
@@ -167,14 +167,14 @@ def process_single_csv(
     
     # Генерация XML
     try:
-        sys_xml = generate_sysconfig_xml(ad_guid, users_data)
+        sys_xml = generate_access_xml(ad_guid, users_data)
         energy_xml = generate_energy_xml(users_data)
-        with open(f"{base_name}{SYSCONFIG_SUFFIX}", 'w', encoding='utf-8') as f:
+        with open(f"{base_name}{ACCESS_SUFFIX}", 'w', encoding='utf-8') as f:
             f.write(sys_xml)
         with open(f"{base_name}{ENERGY_SUFFIX}", 'w', encoding='utf-8') as f:
             f.write(energy_xml)
         logger.info(f"✅ Успешно сгенерированы XML-файлы: "
-                   f"{base_name}{SYSCONFIG_SUFFIX}, {base_name}{ENERGY_SUFFIX}")
+                   f"{base_name}{ACCESS_SUFFIX}, {base_name}{ENERGY_SUFFIX}")
     except Exception as e:
         logger.error(f"❌ Ошибка генерации XML для файла {csv_file}: {e}")
         logger.debug(f"Детали ошибки: {traceback.format_exc()}")

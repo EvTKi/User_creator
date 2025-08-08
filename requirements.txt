@@ -1,0 +1,11 @@
+# requirements.txt
+
+# Основные зависимости
+PyQt5>=5.15.0
+ldap3>=2.9.0
+
+# Зависимости для PyInstaller (если будете создавать .exe)
+pyinstaller>=6.0.0
+
+# Стандартная библиотека Python (указана для полноты, обычно не требуется в requirements.txt)
+# json, os, sys, traceback, typing, csv, uuid, getpass, logging - все это встроено

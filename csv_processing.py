@@ -13,7 +13,7 @@ from config_loader import CONFIG
 
 INPUT_ENCODING = CONFIG['input']['encoding']  # должно быть "windows-1251"
 DELIMITER = CONFIG['input']['delimiter']
-
+NOT_IN_AD_CSV = CONFIG ['output'] ['not_in_ad_csv']
 def get_file_encoding(file_path: str) -> str:
     """
     Определяет кодировку файла по его первым байтам.
@@ -42,7 +42,7 @@ def get_file_encoding(file_path: str) -> str:
         # Возвращаем кодировку по умолчанию
         return INPUT_ENCODING
 
-def find_csv_files(exclude_files: List[str]) -> List[str]:
+def find_csv_files(exclude_files: List[str] = ['Sample.csv', NOT_IN_AD_CSV]) -> List[str]:
     """
     Находит все CSV-файлы в текущей директории, исключая указанные.
     
@@ -177,7 +177,7 @@ def process_user_row(row: Dict, row_index: int, csv_file: str, mode: str, ad_con
             'roles': row.get('roles', ''),
             'groups': row.get('groups', ''),
             'parent_energy': row.get('parent_energy', ''),
-            'parent_sysconfig': row.get('parent_sysconfig', '')
+            'parent_access': row.get('parent_access', '')
         }
     except Exception as e:
         logger.error(f"❌ Ошибка обработки строки {row_index + 1} в файле {csv_file}: {e}")

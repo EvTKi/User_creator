@@ -1,120 +1,200 @@
-# Импорт/экспорт пользователей: конвертация CSV → XML и обратное обновление person_guid
+# User Creator
 
-## Описание
+Приложение для обработки CSV-файлов с данными пользователей, генерации XML-файлов в форматах Access и Energy, и (опционально) интеграции с Active Directory для получения уникальных идентификаторов пользователей (GUID).
 
-Этот PowerShell-скрипт используется для массовой обработки CSV-файлов пользователей:
-- Генерирует XML-файлы (`sysconfig.xml` и `energy.xml`) на основе данных из CSV
-- Если в строке отсутствует GUID пользователя (`person_guid`), он автоматически генерируется для этой строки
-- Итоговый person_guid записывается обратно в исходный CSV-файл
-- **Если в CSV присутствуют поля email, mobilePhone, position, OperationalAuthorities или electrical_safety_level, они попадут в итоговый XML-файл:**
-  - email — в блок `<cim:Person.electronicAddress><cim:ElectronicAddress.email1>…</cim:ElectronicAddress.email1>`
-  - mobilePhone — в блок `<cim:Person.mobilePhone><cim:TelephoneNumber.localNumber>…</cim:TelephoneNumber.localNumber>`
-  - position — в блок `<me:Person.Position rdf:resource='#_значение'/>`
-  - OperationalAuthorities — по каждому uid в списке (через "!") по строке `<cim:Person.operationalAuthority rdf:resource="#_uid" />`
-  - electrical_safety_level — в блоке `<me:Person.ElectricalSafetyLevel rdf:resource="#_значение"/>`
-- **Для каждого пользователя формируется отдельный блок `<cim:Name ...>`. Ссылка на этот блок добавляется в `<cim:Person ...>` через строку `<cim:IdentifiedObject.Names rdf:resource="#_$guid"/>`.**
-- **Любые строки, где поле `name` пусто или состоит только из пробелов, а также Sample.csv, игнорируются и не попадают ни в XML, ни в CSV.**
-- **Независимо от исходной кодировки CSV (UTF-8, UTF-16, Windows-1251), файл пересохраняется во временный файл в Windows-1251 для гарантированной поддержки кириллицы и корректной работы в Excel.**
+## Возможности
 
-## Формат исходного CSV
-
-- **Кодировка:**  
-  CSV можно сохранять в UTF-8 (с BOM или без) или Windows-1251. Скрипт автоматически определяет и преобразует исходный файл в нужную кодировку.
-
-- **Разделитель:**  
-  Скрипт автоматически определяет разделитель (`;` или `,`).
-
-- **Заголовок и поля:**
-
-| Колонка                 | Обязательно                         | Описание                                                                                    |
-| ----------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| person_guid             | <p style="text-align:center;">❌</p> | GUID пользователя (может быть пустым — заполнится скриптом)                                 |
-| name                    | <p style="text-align:center;">✅</p> | ФИО пользователя (например, Иванов Иван Иванович)                                           |
-| login                   | <p style="text-align:center;">✅</p> | Логин пользователя                                                                          |
-| email                   | <p style="text-align:center;">❌</p> | Электронная почта (опционально, попадёт в energy.xml как email1)                            |
-| mobilePhone             | <p style="text-align:center;">❌</p> | Мобильный телефон (опционально, попадёт в energy.xml как localNumber)                       |
-| position                | <p style="text-align:center;">❌</p> | GUID должности (опционально, попадёт в energy.xml как Position)                             |
-| roles                   | <p style="text-align:center;">❌</p> | Список GUID ролей через `!`(опционально, попадёт в sysconfig.xml как Roles)                 |
-| groups                  | <p style="text-align:center;">❌</p> | Список GUID групп пользователей через `!` (опционально, попадёт в sysconfig.xml как Groups) |
-| OperationalAuthorities  | <p style="text-align:center;">❌</p> | Список GUID полномочий через `!` (energy.xml — массив блоков operationalAuthority)          |
-| electrical_safety_level | <p style="text-align:center;">❌</p> | GUID уровня электробезопасности (опционально, energy.xml — ElectricalSafetyLevel)           |
-| parent_energy           | <p style="text-align:center;">✅</p> | GUID родителя для energy.xml                                                                |
-| parent_sysconfig        | <p style="text-align:center;">✅</p> | GUID родителя для sysconfig.xml                                                             |
-
-**Пример содержимого:**
-
-| person_guid                          | name                             | login          | email        | mobilePhone | position                             | roles                                                                     | groups                               | OperationalAuthorities                                                    | electrical_safety_level              | parent_energy                        | parent_sysconfig                     |
-| ------------------------------------ | -------------------------------- | -------------- | ------------ | ----------- | ------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------ | ------------------------------------ |
-|                                      | Буханов Андрей Юрьевич           | Bukhanov.Ayu   | ayu@mail.ru  | 9110001010  | 62c05a53-0b27-4a62-b958-c24840a13c30 |                                                                           |                                      | 62c05a53-0b27-4a62-b958-c24840a13c30!62c05a53-0b27-4a62-b958-c24840a13c30 | 62c05a53-0b27-4a62-b958-c24840a13c30 | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
-| 62c05a53-0b27-4a62-b958-c24840a13c30 | Алексенцев Александр Геннадьевич | Sokolov.Sni    | asni@mail.ru | 9215050011  |                                      | 62c05a53-0b27-4a62-b958-c24840a13c30                                      | 62c05a53-0b27-4a62-b958-c24840a13c30 |                                                                           | 62c05a53-0b27-4a62-b958-c24840a13c30 | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
-|                                      | Михайлова Анна Сергеевна         | Mikhaylova.Ase |              |             |                                      | 62c05a53-0b27-4a62-b958-c24840a13c30!62c05a53-0b27-4a62-b958-c24840a13c30 |                                      |                                                                           |                                      | f0eb1cfb-7939-46e2-b36a-ba316b109a56 | 74f289ae-0eb9-4341-8912-8e211f4c01f9 |
-
-*Поля email, mobilePhone, position, roles. groups OperationalAuthorities, electrical_safety_level могут быть опущены или оставаться пустыми — в этом случае соответствующие XML-блоки отсутствуют.*
-
-*Если `person_guid` пуст, он будет автоматически сгенерирован и подставлен скриптом в итоговый CSV.*
-
-*Строки, где поле `name` пустое или состоит только из пробелов, игнорируются скриптом.*
-
----
-
-## Как использовать скрипт
-
-1. Поместите один или несколько CSV-файлов в рабочую папку со скриптом (файл `Sample.csv` всегда игнорируется автоматически).
-2. Запустите `run_User_Creator.bat` (**от имени пользователя с правами записи в директорию!**).
-3. В появившемся запросе `Использовать данные из AD по логину (Y) или по CSV (N)? (y/n)` необходимо определить метод получения **GUID пользователей** - используя AD или использовать `person_guid` и автоматическую генерацию GUID из файла `.csv`
-4. Логика обработки при выборе `Y`:
-  4.1. **GUID пользователя** берется из AD (по login)
-  4.2. Если не найден — **GUID пользователя** берется из person_guid в csv
-  4.3. Если **GUID пользователя** не найден в csv — генерируется новый
-5. Логика обработки при выборе `N`:
-  5.1. Введите GUID домена (adGuid), когда появится запрос (выбираем из ИМ) 
-  5.2. **GUID пользователя** берется из person_guid в csv (при наличии)
-  5.3. Если **GUID пользователя** отсутствует в person_guid в csv — генерируется новый
-6. Скрипт создаст для каждого исходного CSV два XML-файла (`sysconfig.xml`, `energy.xml`).
-7. Если в строках исходного CSV не было указан `person_guid`, он впишется обратно в CSV автоматически.
-8.  Итоговый CSV сохранится **в кодировке Windows-1251** для идеальной совместимости с Excel.
-
----
-
-## Результаты
-
-- Каждый обработанный CSV будет обновлен: теперь в поле `person_guid` у всех строк будет заполнен реальный GUID.
-- В каждой папке появятся файлы:
-    - `[исходный].sysconfig.xml`
-    - `[исходный].energy.xml`
-    - `not_in_AD.csv` с колонками login, name, person_guid для всех не найденных в AD пользователей (в режиме Y);
-- Если заполнено поле email — оно появится в XML `<cim:ElectronicAddress.email1>`.
-- Если заполнено поле mobilePhone — оно появится в XML `<cim:TelephoneNumber.localNumber>`.
-- Если заполнено поле position — в каждом блоке `<cim:Person ...>` появится `<me:Person.Position rdf:resource="#_значение"/>`.
-- Если заполнено поле roles — в каждом блоке `<cim:User ...>` появится `<cim:Principal.Roles rdf:resource="#_значение" />`.
-- Если заполнено поле groups — в каждом блоке `<cim:User ...>` появится `<cim:Principal.Groups rdf:resource="#_значение" />`.
-- Если заполнено поле OperationalAuthorities — в каждом блоке `<cim:Person ...>` появятся строки вида `<cim:Person.operationalAuthority rdf:resource="#_uid"/>` для каждого uid.
-- Если заполнено поле electrical_safety_level — в каждом блоке `<cim:Person ...>` появится `<me:Person.ElectricalSafetyLevel rdf:resource="#_значение"/>`.
-- Для каждого пользователя появится отдельный блок `<cim:Name ...>` с отдельным GUID и сокращённым ФИО, а внутри блока Person будет ссылка `<cim:IdentifiedObject.Names rdf:resource="#_GUID"/>` на соответствующий Name.
-- Строки без значения name (или если name только из пробелов) будут полностью проигнорированы и не попадут в экспортируемые файлы.
-- `Sample.csv` **всегда** пропускается.
-
----
-
-## Особенности
-
-- **Кириллица и русские буквы полностью поддерживаются** — весь поток-обработка идёт через Windows-1251 для итоговых CSV.
-- Если были заполнены значения `person_guid`, они сохраняются без изменений.
-- Скрипт определяет разделитель — можно использовать как `;`, так и `,`.
-- Итоговые XML всегда сохраняются в кодировке UTF-8.
-
----
+*   **Обработка CSV-файлов**: Чтение данных пользователей из CSV-файлов в заданной директории.
+*   **Генерация XML**:
+    *   Создание XML-файлов формата **Access**.
+    *   Создание XML-файлов формата **Energy**.
+*   **Интеграция с Active Directory (AD)**:
+    *   Получение GUID домена.
+    *   Получение GUID пользователей по их логину (`sAMAccountName`).
+*   **Работа без AD**: Возможность вручную указать GUID домена и использовать GUID из CSV-файлов или генерировать их автоматически.
+*   **Гибкая настройка**: Конфигурация через `config.json` и `logging_config.json`.
+*   **Логирование**: Подробное логирование процесса обработки в файлы и в консоль/интерфейс.
+*   **Два интерфейса**:
+    *   **Консольное приложение** (`main.py`): Традиционный интерфейс командной строки.
+    *   **Графическое приложение** (`ui.py`): Удобный GUI на основе PyQt5 с прогресс-баром и реальными логами.
 
 ## Требования
 
-- PowerShell 5.1 или выше
-- Права на запись файлов в директории CSV
+*   Python 3.6 или выше
+*   Библиотеки, перечисленные в `requirements.txt`:
+    *   `PyQt5` (для GUI)
+    *   `ldap3` (для работы с AD)
+    *   `pyinstaller` (для создания .exe, опционально)
 
----
+## Установка
 
-## Примечания
+1.  **Клонируйте репозиторий или скачайте исходный код.**
+2.  **(Рекомендуется) Создайте виртуальное окружение:**
+    ```bash
+    # Создание виртуального окружения с именем 'venv'
+    python -m venv venv
 
-- Если CSV после обработки выглядит поврежденным (например, не читается в Excel), убедитесь, что нет нестандартных символов в строках и заголовках, а структура соответствует примеру выше.
-- Для лучшей совместимости используйте редакторы Notepad++ или VS Code для просмотра и подготовки CSV.
+    # Активация виртуального окружения
+    # На Windows (в командной строке cmd):
+    venv\Scripts\activate
+    # На Windows (в PowerShell):
+    # venv\Scripts\Activate.ps1
+    # (Может потребоваться Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser)
+    # На macOS/Linux:
+    # source venv/bin/activate
+    ```
+3.  **Установите зависимости:**
+    Убедитесь, что виртуальное окружение активировано.
+    ```bash
+    pip install -r requirements.txt
+    ```
 
----
+## Конфигурация
+
+### `config.json`
+
+Основной файл конфигурации приложения. Должен находиться в корневой директории проекта (рядом с `main.py` или `ui.py`).
+
+Пример структуры:
+```json
+{
+  "ad": {
+    "enabled": true,
+    "domain_controller": "your.domain.controller.com",
+    "domain_dn": "DC=your,DC=domain,DC=com",
+    "user": "CN=service_account,OU=Service Accounts,DC=your,DC=domain,DC=com"
+  },
+  "input": {
+    "encoding": "windows-1251",
+    "delimiter": ";"
+  },
+  "output": {
+    "log_dir": "log",
+    "not_in_ad_csv": "not_in_AD.csv",
+    "Access_xml_suffix": "_Access.xml",
+    "energy_xml_suffix": "_Energy.xml"
+  },
+  "xml": {
+    "model_version_Access": "2025-03-04(11.7.1.7)",
+    "model_version_energy": "1.0"
+  }
+}
+```
+- `ad.enabled` Включить/выключить интеграцию с Active Directory.
+- `ad.domain_controller` Адрес контроллера домена.
+- `ad.domain_dn` отличительное имя корня домена.
+- `ad.user` DN учетной записи службы для подключения к AD.
+- `input.encoding` Кодировка входных CSV-файлов (по умолчанию `windows-1251`).
+- `input.delimiter` Разделитель в CSV-файлах (по умолчанию `;`).
+- `output.log_dir` Директория для сохранения лог-файлов.
+- `output.not_in_ad_csv`: Имя файла для сохранения списка пользователей, не найденных в AD.
+- `output.Access_xml_suffix` Суффикс для создаваемых XML-файлов Access.
+- `output.energy_xml_suffix` Суффикс для генерируемых XML-файлов Energy.
+- `xml.model_version_Access` Версия модели для XML Access.
+- `xml.model_version_energy` Версия модели для XML Energy.
+
+### `logging_config.json`
+
+Файл конфигурации стандартной библиотеки логирования Python (`logging`). Определяет форматтеры и обработчики для основных логов (`app_*.log`, `errors_*.log`)
+
+Пример структуры:
+```
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] - %(message)s"
+        },
+        "detailed": {
+            "format": "%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d] - %(message)s"
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+            "formatter": "standard",
+            "stream": "ext://sys.stdout"
+        }
+    },
+    "root": {
+        "level": "DEBUG",
+        "handlers": ["console"]
+    }
+}
+```
+*Обратите внимание: Файловые обработчики `app_*.log``errors_*.log` добавляются программно в `logging_config.py` поэтому их не нужно указывать в этом файле.
+
+## Использование
+
+### Подготовка
+
+1. Убедитесь, что файлы `config.json` и `logging_config.json` находятся в корневой директории проекта.
+2. Подготовьте CSV-файлы с данными пользователей. Ожидаемые столбцы (многие из них необязательны):
+    - `name` (обязательно): полное имя пользователя.
+    - `login` Логин пользователя (для поиска в AD).
+    - `person_guid` идентификатор GUID пользователя (если не используется AD или пользователь не найден).
+    - `email` Электронная почта.
+    - `mobilePhone` Мобильный телефон.
+    - `position` Должность.
+    - `OperationalAuthorities` Оперативные полномочия (разделитель `!`)
+    - `electrical_safety_level` Уровень электробезопасности.
+    - `roles` Роли (разделитель).
+    - `groups` Группы (разделитель)
+    - `parent_energy` Родительский объект для Energy.
+    - `parent_Access` Родительский объект для Access.
+   
+  Запуск консольного приложения
+  ```
+   Активируйте виртуальное окружение, если оно используется
+    venv\Scripts\activate (Windows cmd)
+    python main.py
+```
+1. Выберите режим работы (с AD или без).
+2. Введите пароль AD (если выбран режим «с AD») или идентификатор GUID домена (если выбран режим «без AD»).
+3. Укажите папку с CSV-файлами.
+4. Нажмите кнопку «▶ Запустить обработку».
+
+## Логирование
+
+Приложение создаёт несколько типов лог-файлов в директории, указанной в `config.json` (`output.log_dir`):
+
+- `app_YYYY-MM-DD.log`: Основной журнал приложения.
+- `errors_YYYY-MM-DD.log`: Журнал ошибок приложения.
+- `{имя_csv}_YYYY-MM-DD.log`Отдельный журнал для каждого обрабатываемого CSV-файла.
+- `user_creator_ui_YYYY-MM-DD.log`: Журнал работы графического интерфейса (только при запуске `ui.py`).
+
+Формат сообщений в логах определяется в `logging_config.json`.
+
+## Создание исполняемого файла (.exe)
+
+Для создания автономного `.exe` файла можно использовать `PyInstaller`.
+
+1. Убедитесь, что `pyinstaller` установлен (`pip install pyinstaller`).
+2. (Необязательно) Создайте файл спецификации: `pyi-makespec --onedir --name=UserCreator ui.py`
+3. Соберите проект:
+    - Если есть `.spec` файл: `pyinstaller UserCreator.spec`
+    - Если нет: `pyinstaller --onedir ui.py`
+4. Исполняемый файл и зависимости будут находиться в папке `dist/UserCreator`. 5. **ВАЖНО**: Скопируйте файлы `config.json` и `logging_config.json` в папку `dist/UserCreator` рядом с `UserCreator.exe`.
+
+## Структура проекта
+
+- `main.py`: Основной скрипт консольного приложения.
+- `ui.py`Скрипт графического приложения (PyQt5).
+- `config_loader.py`: Модуль для загрузки `config.json`.
+- `logging_config.py`: Модуль для настройки логирования.
+- `csv_processing.py`Модуль для работы с CSV-файлами.
+- `ad_operations.py`: Модуль для работы с Active Directory.
+- `xml_generation.py`: Модуль для создания XML-файлов.
+- `config.json`: Файл конфигурации приложения.
+- `logging_config.json`: Файл конфигурации логирования.
+- `requirements.txt`Список зависимостей Python.
+- `README.md`: Этот файл.
+
+## Разработка
+
+- Код структурирован по модулям для удобства поддержки и повторного использования.
+- Используется стандартная библиотека логирования Python.
+- Для графического интерфейса используется PyQt5.
+- Для работы с AD используется библиотека `ldap3`.

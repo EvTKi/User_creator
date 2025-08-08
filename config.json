@@ -2,7 +2,7 @@
     "output": {
       "log_dir": "log",
       "energy_xml_suffix": "_Energy.xml",
-      "sysconfig_xml_suffix": "_SysConfig.xml",
+      "access_xml_suffix": "_Access.xml",
       "not_in_ad_csv": "not_in_AD.csv"
     },
     "ad": {
@@ -16,7 +16,7 @@
       "delimiter": ";"
     },
     "xml": {
-      "model_version_sysconfig": "2025-03-04(11.7.1.7)",
+      "model_version_access": "2025-03-04(11.7.1.7)",
       "model_version_energy": "ver:11.6.2.193;opt:Aggr,AMI,..."
     }
   }

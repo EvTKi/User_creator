@@ -12,12 +12,12 @@ import logging
 from config_loader import CONFIG
 
 # Разделяем версии для разных моделей
-MODEL_VERSION_SYS = CONFIG['xml']['model_version_sysconfig']  # Например: "2025-03-04(11.7.1.7)"
+MODEL_VERSION_SYS = CONFIG['xml']['model_version_access']  # Например: "2025-03-04(11.7.1.7)"
 MODEL_VERSION_ENERGY = CONFIG['xml']['model_version_energy']  # Например: "1.0"
 
-def generate_sysconfig_xml(ad_guid: str, users: List[Dict]) -> str:
+def generate_access_xml(ad_guid: str, users: List[Dict]) -> str:
     """
-    Генерирует XML-файл для SysConfig.
+    Генерирует XML-файл для Access.
     
     Args:
         ad_guid (str): GUID домена Active Directory.
@@ -44,7 +44,7 @@ def generate_sysconfig_xml(ad_guid: str, users: List[Dict]) -> str:
             person_guid = user['person_guid']
             name = user['name']
             login = user.get('login', '') or ''
-            parent_sysconfig = user.get('parent_sysconfig', '') or ''
+            parent_access = user.get('parent_access', '') or ''
             roles = user.get('roles', '') or ''
             groups = user.get('groups', '') or ''
             roles_blocks = ''.join(
@@ -63,8 +63,8 @@ def generate_sysconfig_xml(ad_guid: str, users: List[Dict]) -> str:
     <cim:Principal.isEnabled>true</cim:Principal.isEnabled>
     <cim:Principal.login>{login}</cim:Principal.login>
 '''
-            if parent_sysconfig:
-                xml += f'    <cim:IdentifiedObject.ParentObject rdf:resource="#_{parent_sysconfig}" />\n'
+            if parent_access:
+                xml += f'    <cim:IdentifiedObject.ParentObject rdf:resource="#_{parent_access}" />\n'
             
             if roles_blocks:
                 xml += roles_blocks
@@ -76,7 +76,7 @@ def generate_sysconfig_xml(ad_guid: str, users: List[Dict]) -> str:
         xml += '</rdf:RDF>'
         return xml
     except Exception as e:
-        logging.getLogger(__name__).error(f"Ошибка генерации SysConfig XML: {e}")
+        logging.getLogger(__name__).error(f"Ошибка генерации Access XML: {e}")
         logging.getLogger(__name__).debug(f"Детали ошибки: {traceback.format_exc()}")
         raise
 
