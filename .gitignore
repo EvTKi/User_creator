@@ -2,6 +2,8 @@
 *.xlsx
 *.xlsm
 *.xml
-
+/build
 /log
 __pycache__
+*.csv
+*.log
