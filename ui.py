@@ -14,7 +14,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSettings
 from PyQt5.QtGui import QTextCursor, QFont
 import logging
 import traceback
-
+import datetime # Добавляем импорт datetime
 # Импортируем логику приложения
 try:
     # Импортируем конфигурацию
@@ -579,30 +579,53 @@ class UserCreatorWindow(QMainWindow):
             event.accept()
 
 def main():
-    # Настройка логгера для основного приложения
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s [%(levelname)s] [%(name)s] - %(message)s',
-        handlers=[
-            logging.FileHandler('user_creator_ui.log', encoding='utf-8'),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+    # --- НАСТРОЙКА ЛОГИРОВАНИЯ ДЛЯ UI С ДАТОЙ ---
+    # Определяем имя файла лога с текущей датой
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    ui_log_filename = f"log/user_creator_ui_{today}.log"
     
-    main_logger = logging.getLogger("UserCreatorUI")
+    # Настраиваем логгер "UserCreatorUI" с файлом, содержащим дату, и правильным форматом
+    # Этот логгер будет родительским для всех логгеров UI (UserCreatorUI.MainWindow, UserCreatorUI.Worker)
+    ui_logger = logging.getLogger("UserCreatorUI")
+    ui_logger.setLevel(logging.DEBUG)
+    
+    # Создаем обработчик для файла с датой
+    ui_file_handler = logging.FileHandler(ui_log_filename, encoding='utf-8')
+    # Используем формат, аналогичный 'detailed' из logging_config.json
+    ui_formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d] - %(message)s')
+    ui_file_handler.setFormatter(ui_formatter)
+    ui_file_handler.setLevel(logging.DEBUG) # Записываем все сообщения DEBUG и выше
+    
+    # Добавляем обработчик к логгеру "UserCreatorUI"
+    # Это означает, что все сообщения от "UserCreatorUI.*" будут писаться в этот файл
+    ui_logger.addHandler(ui_file_handler)
+    
+    # Также можно добавить вывод в консоль (опционально, как в оригинале)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(ui_formatter) # Используем тот же формат для консоли
+    console_handler.setLevel(logging.INFO) # В консоль пойдут сообщения INFO и выше
+    ui_logger.addHandler(console_handler)
+    
+    # Отключаем propagate, чтобы сообщения не дублировались в корневой логгер
+    # (если вы используете setup_logging() из logging_config, иначе будут дубли)
+    # ui_logger.propagate = False 
+
+    main_logger = logging.getLogger("UserCreatorUI") # Этот логгер теперь настроен выше
     main_logger.info("Запуск приложения User Creator GUI")
+    # --- КОНЕЦ НАСТРОЙКИ ЛОГИРОВАНИЯ ---
     
     app = QApplication(sys.argv)
     # Установка стиля
     app.setStyle("Fusion")
     window = UserCreatorWindow()
     window.show()
-    
     main_logger.info("Главное окно отображено")
-    exit_code = sys.exit(app.exec_())
     
+    exit_code = app.exec_()
     main_logger.info("Приложение завершено")
-    sys.exit(exit_code)
+    # sys.exit(exit_code) # app.exec_() уже возвращает код выхода, sys.exit() вызывать не обязательно
+    return exit_code # Возвращаем код выхода
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    sys.exit(exit_code)

@@ -16,6 +16,7 @@
             "formatter": "standard",
             "stream": "ext://sys.stdout"
         },
+     
         "file_app": {
             "class": "logging.FileHandler",
             "level": "DEBUG",
@@ -32,15 +33,10 @@
             "mode": "a",
             "encoding": "utf-8"
         }
-    },
-    "loggers": {
-        "": {
-            "level": "DEBUG",
-            "handlers": ["console", "file_app", "file_errors"]
-        }
+        
     },
     "root": {
         "level": "DEBUG",
-        "handlers": ["console", "file_app", "file_errors"]
-    }
+        "handlers": ["console"] }
+   
 }
