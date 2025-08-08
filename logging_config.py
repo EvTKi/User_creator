@@ -87,7 +87,7 @@ def setup_logging():
     и добавляет/заменяет файловые обработчики с именами, содержащими текущую дату.
     """
     # Определяем путь к logging_config.json
-    LOGGING_CONFIG_JSON_PATH = get_resource_path('logging_config.json')
+    LOGGING_CONFIG_JSON_PATH = get_resource_path('config/logging_config.json')
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"DEBUG (logging_config): Ищу logging_config.json по пути: {LOGGING_CONFIG_JSON_PATH}")
 

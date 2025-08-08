@@ -13,6 +13,7 @@ from config_loader import CONFIG
 
 # Разделяем версии для разных моделей
 MODEL_VERSION_SYS = CONFIG['xml']['model_version_access']  # Например: "2025-03-04(11.7.1.7)"
+print(MODEL_VERSION_SYS)
 MODEL_VERSION_ENERGY = CONFIG['xml']['model_version_energy']  # Например: "1.0"
 
 def generate_access_xml(ad_guid: str, users: List[Dict]) -> str:
