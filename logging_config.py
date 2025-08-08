@@ -19,7 +19,7 @@ os.makedirs(log_dir, exist_ok=True)
 def setup_logging():
     """
     Загружает базовую конфигурацию логгера из logging_config.json
-    и добавляет файловые обработчики с именами, содержащими текущую дату.
+    и добавляет/заменяет файловые обработчики с именами, содержащими текущую дату.
     """
     config_path = 'logging_config.json'
     today = datetime.now().strftime("%Y-%m-%d")
@@ -28,8 +28,38 @@ def setup_logging():
     if os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
-        logging.config.dictConfig(config)
-        print(f"Базовая конфигурация логгирования загружена из {config_path}")
+        
+        # Имена файловых обработчиков, которые мы хотим заменить
+        file_handler_names_to_remove = ["file_app", "file_errors"]
+
+        # 1. Удаляем определения этих обработчиков из config["handlers"]
+        handlers_config = config.get("handlers", {})
+        for handler_name in file_handler_names_to_remove:
+            handlers_config.pop(handler_name, None) # Безопасно удаляем, если есть
+
+        # 2. Удаляем ссылки на эти обработчики из корневого логгера
+        # Проверяем оба возможных способа определения корневого логгера в JSON
+        root_logger_config = config.get("root") # Стиль "root"
+        if not root_logger_config:
+            root_logger_config = config.get("loggers", {}).get("") # Стиль "loggers": { "": ... }
+        
+        if root_logger_config and "handlers" in root_logger_config:
+             # Создаем новый список обработчиков, исключая те, что удалили
+            updated_handlers = [
+                h for h in root_logger_config["handlers"] 
+                if h not in file_handler_names_to_remove
+            ]
+            root_logger_config["handlers"] = updated_handlers
+
+        # Применяем модифицированную конфигурацию
+        try:
+            logging.config.dictConfig(config)
+            print(f"Базовая конфигурация логгирования загружена из {config_path}")
+        except ValueError as e: # Перехватываем конкретную ошибку конфигурации
+            print(f"❌ Ошибка применения конфигурации из {config_path}: {e}")
+            print("Используется резервная настройка.")
+            logging.basicConfig(level=logging.INFO)
+            
     else:
         # Резервная настройка, если JSON не найден
         print(f"Файл конфигурации {config_path} не найден. Используется резервная настройка.")
@@ -39,14 +69,21 @@ def setup_logging():
     app_filename = f"app_{today}.log"
     app_log_path = os.path.join(log_dir, app_filename)
     
-    # Получаем форматтер для app логов из уже загруженной конфигурации
+    # Получаем форматтер 'detailed' из уже загруженной конфигурации, если он есть
     try:
-        # Предполагаем, что форматтер 'detailed' используется для файлов
-        app_formatter = logging.getLogger().handlers[0].formatter # Берем форматтер из первого обработчика (обычно консольного)
-        # Или можно явно создать, если знаем имя форматтера из JSON
-        # app_formatter_config = config['formatters']['detailed'] 
-        # app_formatter = logging.Formatter(app_formatter_config['format'])
-    except (IndexError, AttributeError):
+        # Попробуем получить форматтер из конфигурации
+        # Проверяем оба возможных места для форматтеров
+        detailed_format = None
+        if "formatters" in config and "detailed" in config["formatters"]:
+             detailed_format = config["formatters"]["detailed"]["format"]
+        elif "formatters" in config and "detailed" in config.get("formatters", {}): # Дублирующая проверка на случай опечатки в логике выше
+             detailed_format = config["formatters"]["detailed"]["format"]
+             
+        if detailed_format:
+            app_formatter = logging.Formatter(detailed_format)
+        else:
+            raise KeyError("detailed formatter not found in config")
+    except (KeyError, NameError):
         # Если не удалось получить, создаем стандартный
         app_formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d] - %(message)s')
 

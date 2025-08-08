@@ -20,7 +20,7 @@
             "class": "logging.FileHandler",
             "level": "DEBUG",
             "formatter": "detailed",
-            "filename": "logs/app.log",
+            "filename": "log/app.log",
             "mode": "a",
             "encoding": "utf-8"
         },
@@ -28,7 +28,7 @@
             "class": "logging.FileHandler",
             "level": "ERROR",
             "formatter": "detailed",
-            "filename": "logs/errors.log",
+            "filename": "log/errors.log",
             "mode": "a",
             "encoding": "utf-8"
         }
