@@ -1,12 +1,12 @@
 # User Creator
 
-Приложение для обработки CSV-файлов с данными пользователей, генерации XML-файлов в форматах SysConfig и Energy, и (опционально) интеграции с Active Directory для получения уникальных идентификаторов пользователей (GUID).
+Приложение для обработки CSV-файлов с данными пользователей, генерации XML-файлов в форматах Access и Energy, и (опционально) интеграции с Active Directory для получения уникальных идентификаторов пользователей (GUID).
 
 ## Возможности
 
 *   **Обработка CSV-файлов**: Чтение данных пользователей из CSV-файлов в заданной директории.
 *   **Генерация XML**:
-    *   Создание XML-файлов формата **SysConfig**.
+    *   Создание XML-файлов формата **Access**.
     *   Создание XML-файлов формата **Energy**.
 *   **Интеграция с Active Directory (AD)**:
     *   Получение GUID домена.
@@ -71,11 +71,11 @@
   "output": {
     "log_dir": "log",
     "not_in_ad_csv": "not_in_AD.csv",
-    "sysconfig_xml_suffix": "_SysConfig.xml",
+    "Access_xml_suffix": "_Access.xml",
     "energy_xml_suffix": "_Energy.xml"
   },
   "xml": {
-    "model_version_sysconfig": "2025-03-04(11.7.1.7)",
+    "model_version_Access": "2025-03-04(11.7.1.7)",
     "model_version_energy": "1.0"
   }
 }
@@ -88,9 +88,9 @@
 - `input.delimiter` Разделитель в CSV-файлах (по умолчанию `;`).
 - `output.log_dir` Директория для сохранения лог-файлов.
 - `output.not_in_ad_csv`: Имя файла для сохранения списка пользователей, не найденных в AD.
-- `output.sysconfig_xml_suffix` Суффикс для создаваемых XML-файлов SysConfig.
+- `output.Access_xml_suffix` Суффикс для создаваемых XML-файлов Access.
 - `output.energy_xml_suffix` Суффикс для генерируемых XML-файлов Energy.
-- `xml.model_version_sysconfig` Версия модели для XML SysConfig.
+- `xml.model_version_Access` Версия модели для XML Access.
 - `xml.model_version_energy` Версия модели для XML Energy.
 
 ### `logging_config.json`
@@ -143,7 +143,7 @@
     - `roles` Роли (разделитель).
     - `groups` Группы (разделитель)
     - `parent_energy` Родительский объект для Energy.
-    - `parent_sysconfig` Родительский объект для SysConfig.
+    - `parent_Access` Родительский объект для Access.
    
   Запуск консольного приложения
   ```

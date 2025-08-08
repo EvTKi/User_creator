@@ -21,7 +21,7 @@ try:
     from config_loader import CONFIG
     from ad_operations import connect_to_ad, get_domain_guid
     from csv_processing import find_csv_files, process_user_row
-    from xml_generation import generate_sysconfig_xml, generate_energy_xml
+    from xml_generation import generate_access_xml, generate_energy_xml
     from logging_config import LogManager
     from csv_processing import get_file_encoding, read_csv_file, write_csv_file
     from ad_operations import get_user_guid
@@ -31,7 +31,7 @@ except ImportError as e:
     sys.exit(1)
 
 # Константы из конфигурации (остаются без изменений)
-SYSCONFIG_SUFFIX = CONFIG['output']['sysconfig_xml_suffix']
+ACCESS_SUFFIX = CONFIG['output']['access_xml_suffix']
 ENERGY_SUFFIX = CONFIG['output']['energy_xml_suffix']
 NOT_IN_AD_CSV = CONFIG['output']['not_in_ad_csv']
 AD_ENABLED = CONFIG['ad']['enabled']
@@ -192,11 +192,11 @@ class Worker(QThread):
                     # Генерация XML
                     self.logger.info(f"Начало генерации XML файлов для {csv_file}")
                     self.log_signal.emit(f"  📄 Генерация XML файлов...")
-                    sys_xml = generate_sysconfig_xml(ad_guid, users_data)
+                    sys_xml = generate_access_xml(ad_guid, users_data)
                     energy_xml = generate_energy_xml(users_data)
-                    sys_xml_filename = f"{base_name}{SYSCONFIG_SUFFIX}"
+                    sys_xml_filename = f"{base_name}{ACCESS_SUFFIX}"
                     energy_xml_filename = f"{base_name}{ENERGY_SUFFIX}"
-                    self.logger.debug(f"Запись SysConfig XML: {sys_xml_filename}")
+                    self.logger.debug(f"Запись Access XML: {sys_xml_filename}")
                     with open(sys_xml_filename, 'w', encoding='utf-8') as f:
                         f.write(sys_xml)
                     self.logger.debug(f"Запись Energy XML: {energy_xml_filename}")
@@ -205,7 +205,7 @@ class Worker(QThread):
                     logger.info(f"✅ Успешно сгенерированы XML-файлы: "
                                f"{sys_xml_filename}, {energy_xml_filename}")
                     self.logger.info(f"XML файлы успешно созданы: {sys_xml_filename}, {energy_xml_filename}")
-                    self.log_signal.emit(f"  ✅ XML файлы созданы: {SYSCONFIG_SUFFIX}, {ENERGY_SUFFIX}")
+                    self.log_signal.emit(f"  ✅ XML файлы созданы: {ACCESS_SUFFIX}, {ENERGY_SUFFIX}")
                     
                     # Перезапись CSV
                     self.logger.debug(f"Перезапись CSV файла: {file_path}")

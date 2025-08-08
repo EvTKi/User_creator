@@ -177,7 +177,7 @@ def process_user_row(row: Dict, row_index: int, csv_file: str, mode: str, ad_con
             'roles': row.get('roles', ''),
             'groups': row.get('groups', ''),
             'parent_energy': row.get('parent_energy', ''),
-            'parent_sysconfig': row.get('parent_sysconfig', '')
+            'parent_access': row.get('parent_access', '')
         }
     except Exception as e:
         logger.error(f"❌ Ошибка обработки строки {row_index + 1} в файле {csv_file}: {e}")

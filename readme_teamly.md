@@ -1,6 +1,6 @@
 # User Creator (.exe версия)
 
-Графическое приложение для обработки CSV-файлов с данными пользователей, генерации XML-файлов в форматах SysConfig и Energy, и (опционально) интеграции с Active Directory.
+Графическое приложение для обработки CSV-файлов с данными пользователей, генерации XML-файлов в форматах Access и Energy, и (опционально) интеграции с Active Directory.
 
 Этот документ описывает, как использовать собранную версию приложения в виде исполняемого файла `UserCreator.exe`.
 
@@ -51,11 +51,11 @@
   "output": {
     "log_dir": "log",
     "not_in_ad_csv": "not_in_AD.csv",
-    "sysconfig_xml_suffix": "_SysConfig.xml",
+    "Access_xml_suffix": "_Access.xml",
     "energy_xml_suffix": "_Energy.xml"
   },
   "xml": {
-    "model_version_sysconfig": "2025-03-04(11.7.1.7)",
+    "model_version_Access": "2025-03-04(11.7.1.7)",
     "model_version_energy": "1.0"
   }
 }
@@ -68,9 +68,9 @@
 - `input.delimiter`: Разделитель в CSV-файлах (по умолчанию `;`).
 - `output.log_dir`: Относительный путь к каталогу для сохранения лог-файлов (например, `log` создаст папку `log` рядом с `.exe`).
 - `output.not_in_ad_csv`: Имя файла для сохранения списка пользователей, не найденных в AD.
-- `output.sysconfig_xml_suffix`: Суффикс для создаваемых XML-файлов SysConfig.
+- `output.Access_xml_suffix`: Суффикс для создаваемых XML-файлов Access.
 - `output.energy_xml_suffix`: Суффикс для генерируемых XML-файлов Energy.
-- `xml.model_version_sysconfig`: Версия модели для XML SysConfig.
+- `xml.model_version_Access`: Версия модели для XML Access.
 - `xml.model_version_energy`: Версия модели для XML Energy.
 
 ### `logging_config.json`
@@ -110,7 +110,7 @@
 - `roles`: Роли (разделитель `!`).
 - `groups`: Группы (разделитель `!`).
 - `parent_energy`: Родительский объект для Energy.
-- `parent_sysconfig`: Родительский объект для SysConfig.
+- `parent_Access`: Родительский объект для Access.
 
 ## Выходные данные
 
