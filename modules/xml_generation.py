@@ -157,10 +157,13 @@ def generate_energy_xml(users: List[Dict]) -> str:
       <cim:Person.mName>{fio_middle}</cim:Person.mName>
       <me:Person.Organisation rdf:resource="#_{org_guid}" />
       <me:Person.Department rdf:resource="#_{dep_guid}" />
+
       {phone_block}
       {position_block}
       {electrical_block}
       {operational_blocks}
+      <me:Person.OperationalAuthorities rdf:resource="#_100015DC-0000-0000-C000-0000006D746C" />
+      <me:Person.OperationalAuthorities rdf:resource="#_10001562-0000-0000-C000-0000006D746C" />
   </cim:Person>
   <cim:Name rdf:about="#_{name_abbreviation_guid}">
       <cim:Name.name>{abbreviation}</cim:Name.name>
