@@ -9,26 +9,29 @@ import traceback
 import logging
 
 # Импортируем конфигурацию
-from config_loader import CONFIG
+from .config_loader import CONFIG
 
 # Разделяем версии для разных моделей
-MODEL_VERSION_SYS = CONFIG['xml']['model_version_access']  # Например: "2025-03-04(11.7.1.7)"
+# Например: "2025-03-04(11.7.1.7)"
+MODEL_VERSION_SYS = CONFIG['xml']['model_version_access']
 print(MODEL_VERSION_SYS)
 MODEL_VERSION_ENERGY = CONFIG['xml']['model_version_energy']  # Например: "1.0"
+
 
 def generate_access_xml(ad_guid: str, users: List[Dict]) -> str:
     """
     Генерирует XML-файл для Access.
-    
+
     Args:
         ad_guid (str): GUID домена Active Directory.
         users (List[Dict]): Список словарей с данными пользователей.
-        
+
     Returns:
         str: Сгенерированный XML-документ в виде строки.
     """
     try:
-        created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        created = datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
         # Используем фиксированный GUID для FullModel, как в примере
         full_model_guid = "a1aa400b-15b3-473a-b9c0-64d1c86d321f"
         xml = f'''<?xml version="1.0" encoding="utf-8"?>
@@ -56,9 +59,9 @@ def generate_access_xml(ad_guid: str, users: List[Dict]) -> str:
                 f'    <cim:Principal.Groups rdf:resource="#_{g.strip()}" />\n'
                 for g in groups.split('!') if g.strip()
             )
-            
+
             # Формируем блок Principal
-            xml += f'''  <cim:Principal rdf:about="#_{person_guid}">
+            xml += f'''  <cim:User rdf:about="#_{person_guid}">
     <cim:IdentifiedObject.name>{name}</cim:IdentifiedObject.name>
     <cim:Principal.Domain rdf:resource="#_{ad_guid}" />
     <cim:Principal.isEnabled>true</cim:Principal.isEnabled>
@@ -66,33 +69,36 @@ def generate_access_xml(ad_guid: str, users: List[Dict]) -> str:
 '''
             if parent_access:
                 xml += f'    <cim:IdentifiedObject.ParentObject rdf:resource="#_{parent_access}" />\n'
-            
+
             if roles_blocks:
                 xml += roles_blocks
             if groups_blocks:
                 xml += groups_blocks
-                
-            xml += '  </cim:Principal>\n'
-            
+
+            xml += '  </cim:User>\n'
+
         xml += '</rdf:RDF>'
         return xml
     except Exception as e:
         logging.getLogger(__name__).error(f"Ошибка генерации Access XML: {e}")
-        logging.getLogger(__name__).debug(f"Детали ошибки: {traceback.format_exc()}")
+        logging.getLogger(__name__).debug(
+            f"Детали ошибки: {traceback.format_exc()}")
         raise
+
 
 def generate_energy_xml(users: List[Dict]) -> str:
     """
     Генерирует XML-файл для Energy.
-    
+
     Args:
         users (List[Dict]): Список словарей с данными пользователей.
-        
+
     Returns:
         str: Сгенерированный XML-документ в виде строки.
     """
     try:
-        created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+        created = datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S") + "Z"
         xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:cim="http://iec.ch/TC57/2014/CIM-schema-cim16#" xmlns:cim17="http://iec.ch/TC57/2014/CIM-schema-cim17#" xmlns:me="http://monitel.com/2014/schema-cim16#" xmlns:rh="http://rushydro.ru/2015/schema-cim16#" xmlns:so="http://so-ups.ru/2015/schema-cim16#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <md:FullModel rdf:about="#_energy">
@@ -162,5 +168,6 @@ def generate_energy_xml(users: List[Dict]) -> str:
         return xml
     except Exception as e:
         logging.getLogger(__name__).error(f"Ошибка генерации Energy XML: {e}")
-        logging.getLogger(__name__).debug(f"Детали ошибки: {traceback.format_exc()}")
+        logging.getLogger(__name__).debug(
+            f"Детали ошибки: {traceback.format_exc()}")
         raise

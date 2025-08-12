@@ -7,3 +7,4 @@
 __pycache__
 *.csv
 *.log
+.env_user_creator
