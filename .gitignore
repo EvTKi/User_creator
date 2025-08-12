@@ -3,6 +3,7 @@
 *.xlsm
 *.xml
 /build
+/dist
 /log
 __pycache__
 *.csv

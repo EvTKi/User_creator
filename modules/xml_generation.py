@@ -115,6 +115,8 @@ def generate_energy_xml(users: List[Dict]) -> str:
             position = user.get('position', '') or ''
             operational = user.get('OperationalAuthorities', '') or ''
             electrical = user.get('electrical_safety_level', '') or ''
+            dep_guid = user.get('department', '') or ''
+            org_guid = user.get('organisation', '') or ''
             parent_energy = user.get('parent_energy', '') or ''
             email_block = f'''
 <cim:Person.electronicAddress>
@@ -153,10 +155,12 @@ def generate_energy_xml(users: List[Dict]) -> str:
       <cim:Person.firstName>{fio_first}</cim:Person.firstName>
       <cim:Person.lastName>{fio_last}</cim:Person.lastName>
       <cim:Person.mName>{fio_middle}</cim:Person.mName>
+      <me:Person.Organisation rdf:resource="#_{org_guid}" />
+      <me:Person.Department rdf:resource="#_{dep_guid}" />
       {phone_block}
       {position_block}
       {electrical_block}
-{operational_blocks}
+      {operational_blocks}
   </cim:Person>
   <cim:Name rdf:about="#_{name_abbreviation_guid}">
       <cim:Name.name>{abbreviation}</cim:Name.name>

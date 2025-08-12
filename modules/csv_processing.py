@@ -190,6 +190,8 @@ def process_user_row(row: Dict, row_index: int, csv_file: str, mode: str, ad_con
             'electrical_safety_level': row.get('electrical_safety_level', ''),
             'roles': row.get('roles', ''),
             'groups': row.get('groups', ''),
+            'department': row.get('department', ''),
+            'organisation': row.get('organisation', ''),
             'parent_energy': row.get('parent_energy', ''),
             'parent_access': row.get('parent_access', '')
         }
